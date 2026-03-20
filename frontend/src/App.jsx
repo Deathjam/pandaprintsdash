@@ -64,7 +64,7 @@ export default function App() {
 
   const updateSpool = async (id, payload) => {
     try {
-      const res = await fetch(`http://${window.location.hostname}:3001/api/spools/${id}`, {
+      const res = await fetch(`/api/spools/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -100,7 +100,7 @@ export default function App() {
 
   const loadInventory = async () => {
     try {
-      const res = await fetch(`http://${window.location.hostname}:3001/api/spools`);
+      const res = await fetch('/api/spools');
       if (!res.ok) throw new Error('failed inventory fetch');
       const data = await res.json();
       setInventory(data);
@@ -111,7 +111,7 @@ export default function App() {
 
   const addSpool = async (payload) => {
     try {
-      const res = await fetch(`http://${window.location.hostname}:3001/api/spools`, {
+      const res = await fetch('/api/spools', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -128,7 +128,7 @@ export default function App() {
 
   const deleteSpool = async (id) => {
     try {
-      const res = await fetch(`http://${window.location.hostname}:3001/api/spools/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/spools/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('delete failed');
       setInventory((prev) => prev.filter((item) => item.id !== id));
     } catch (e) {
@@ -139,7 +139,7 @@ export default function App() {
   const fetchSpoolFromUrl = async () => {
     if (!newSpool.store_url) return;
     try {
-      const res = await fetch(`http://${window.location.hostname}:3001/api/spools/fetch-url`, {
+      const res = await fetch('/api/spools/fetch-url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: newSpool.store_url })
@@ -173,7 +173,7 @@ export default function App() {
     }
 
     try {
-      const res = await fetch(`http://${window.location.hostname}:3001/api/ams/${trayId}/stock`, {
+      const res = await fetch(`/api/ams/${trayId}/stock`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -187,7 +187,7 @@ export default function App() {
 
   const loadAmsState = async () => {
     try {
-      const res = await fetch(`http://${window.location.hostname}:3001/api/ams_state`);
+      const res = await fetch('/api/ams_state');
       if (!res.ok) throw new Error('failed AMS state fetch');
       const rows = await res.json();
       const mappedData = rows.map((tray) => {
@@ -216,7 +216,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const wsUrl = `ws://${window.location.hostname}:8080`;
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => setConnectionStatus('Connected to Agent');
