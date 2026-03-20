@@ -3,6 +3,217 @@ import React, { useState, useEffect } from 'react';
 export default function App() {
   const [amsTrays, setAmsTrays] = useState([]);
   const [connectionStatus, setConnectionStatus] = useState('Connecting...');
+  const [manualStock, setManualStock] = useState({});
+  const [inventory, setInventory] = useState([]);
+
+  const hexToColorName = {
+    '#FFFFFF': 'Jade White',
+    '#EC008C': 'Magenta',
+    '#E4BD68': 'Gold',
+    '#3F8E43': 'Mistletoe Green',
+    '#C12E1F': 'Red',
+    '#F7E6DE': 'Beige',
+    '#F55A74': 'Pink',
+    '#FEC600': 'Sunflower Yellow',
+    '#847D48': 'Bronze',
+    '#D1D3D5': 'Light Gray',
+    '#F5547C': 'Hot Pink',
+    '#F4EE2A': 'Yellow',
+    '#A6A9AA': 'Silver',
+    '#FF6A13': 'Orange',
+    '#8E9089': 'Gray',
+    '#FF9016': 'Pumpkin Orange',
+    '#BECF00': 'Bright Green',
+    '#6F5034': 'Cocoa Brown',
+    '#00B1B7': 'Turquoise',
+    '#5E43B7': 'Purple',
+    '#482960': 'Indigo Purple',
+    '#0086D6': 'Cyan',
+    '#5B6579': 'Blue Grey',
+    '#9D432C': 'Brown',
+    '#0A2989': 'Blue',
+    '#545454': 'Dark Gray',
+    '#00AE42': 'Bambu Green',
+    '#9D2235': 'Maroon Red',
+    '#0056B8': 'Cobalt Blue',
+    '#000000': 'Black'
+  };
+
+  const normalizeHex = (hex) => {
+    if (!hex || typeof hex !== 'string') return null;
+    let value = hex.trim();
+    if (!value.startsWith('#')) value = `#${value}`;
+    if (value.length === 9 && value.endsWith('FF')) {
+      // Convert ARGB-like 8-digit to 6-digit
+      value = `#${value.slice(1, 7)}`;
+    }
+    if (value.length === 7) return value.toUpperCase();
+    if (value.length === 4) {
+      return `#${value[1]}${value[1]}${value[2]}${value[2]}${value[3]}${value[3]}`.toUpperCase();
+    }
+    return null;
+  };
+
+  const getColorNameFromHex = (hex) => {
+    const normalized = normalizeHex(hex);
+    return normalized ? (hexToColorName[normalized] || null) : null;
+  };
+
+  const [editingSpoolId, setEditingSpoolId] = useState(null);
+  const [editedSpool, setEditedSpool] = useState(null);
+
+  const updateSpool = async (id, payload) => {
+    try {
+      const res = await fetch(`http://${window.location.hostname}:3001/api/spools/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error('update spool failed');
+      const updated = await res.json();
+      setInventory((prev) => prev.map((item) => (item.id === id ? updated : item)));
+      setEditingSpoolId(null);
+      setEditedSpool(null);
+      return updated;
+    } catch (e) {
+      console.error('updateSpool error', e);
+      return null;
+    }
+  };
+
+  const [newSpool, setNewSpool] = useState({
+    spool_id: '',
+    brand: '',
+    material: '',
+    tray_id: '',
+    with_spool: 'No',
+    color: '',
+    type: '',
+    rfid: 'No',
+    supplier: '',
+    cost: '',
+    purchase_url: '',
+    total_grams: '',
+    remaining_grams: '',
+    store_url: ''
+  });
+
+  const loadInventory = async () => {
+    try {
+      const res = await fetch(`http://${window.location.hostname}:3001/api/spools`);
+      if (!res.ok) throw new Error('failed inventory fetch');
+      const data = await res.json();
+      setInventory(data);
+    } catch (e) {
+      console.error('loadInventory error', e);
+    }
+  };
+
+  const addSpool = async (payload) => {
+    try {
+      const res = await fetch(`http://${window.location.hostname}:3001/api/spools`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error('add spool failed');
+      const created = await res.json();
+      setInventory((prev) => [created, ...prev]);
+      return created;
+    } catch (e) {
+      console.error('addSpool error', e);
+      return null;
+    }
+  };
+
+  const deleteSpool = async (id) => {
+    try {
+      const res = await fetch(`http://${window.location.hostname}:3001/api/spools/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('delete failed');
+      setInventory((prev) => prev.filter((item) => item.id !== id));
+    } catch (e) {
+      console.error('deleteSpool error', e);
+    }
+  };
+
+  const fetchSpoolFromUrl = async () => {
+    if (!newSpool.store_url) return;
+    try {
+      const res = await fetch(`http://${window.location.hostname}:3001/api/spools/fetch-url`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: newSpool.store_url })
+      });
+      if (!res.ok) throw new Error('fetch URL failed');
+      const meta = await res.json();
+      const mappedWithSpool = Number(meta.with_spool) === 1
+        ? 'Yes'
+        : Number(meta.with_spool) === 0
+          ? 'No'
+          : undefined;
+      setNewSpool((prev) => ({
+        ...prev,
+        ...meta,
+        with_spool: mappedWithSpool ?? prev.with_spool,
+        store_url: ''
+      }));
+    } catch (e) {
+      console.error('fetchSpoolFromUrl error', e);
+      setNewSpool((prev) => ({ ...prev, store_url: '' }));
+    }
+  };
+
+  const updateStock = async (trayId) => {
+    const payload = {
+      grams_remaining: manualStock[trayId] !== undefined ? parseFloat(manualStock[trayId]) : undefined,
+    };
+
+    if (payload.grams_remaining === undefined || Number.isNaN(payload.grams_remaining)) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`http://${window.location.hostname}:3001/api/ams/${trayId}/stock`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error('API error');
+      setManualStock(prev => ({ ...prev, [trayId]: '' }));
+    } catch (e) {
+      console.error('failed to update stock', e);
+    }
+  };
+
+  const loadAmsState = async () => {
+    try {
+      const res = await fetch(`http://${window.location.hostname}:3001/api/ams_state`);
+      if (!res.ok) throw new Error('failed AMS state fetch');
+      const rows = await res.json();
+      const mappedData = rows.map((tray) => {
+        const rawColor = (tray.color || '334155').replace('#', '');
+        const gramsRemaining = tray.grams_remaining ?? tray.gramsRemaining ?? null;
+        const gramsUsed = tray.grams_used ?? tray.gramsUsed ?? -1;
+        const rfidDetected = Number(tray.rfid_detected ?? tray.rfidDetected ?? 0) === 1;
+        return {
+          id: parseInt(tray.tray_id !== undefined ? tray.tray_id : tray.id, 10),
+          color: `#${rawColor.substring(0, 6)}`,
+          type: tray.type || 'Empty',
+          gramsUsed,
+          gramsRemaining,
+          rfidDetected,
+        };
+      });
+      setAmsTrays(mappedData);
+    } catch (e) {
+      console.error('loadAmsState error', e);
+    }
+  };
+
+  useEffect(() => {
+    loadInventory();
+    loadAmsState();
+  }, []);
 
   useEffect(() => {
     const wsUrl = `ws://${window.location.hostname}:8080`;
@@ -17,11 +228,17 @@ export default function App() {
         const mappedData = payload.data.map(tray => {
           // Grab whatever color data we have, and strip out any existing # just in case
           const rawColor = (tray.tray_color || tray.color || '334155').replace('#', '');
+          const gramsRemaining = tray.grams_remaining ?? tray.gramsRemaining ?? null;
+          const gramsUsed = tray.grams_used ?? tray.gramsUsed ?? -1;
+          const rfidDetected = Number(tray.rfid_detected ?? tray.rfidDetected ?? 0) === 1;
+
           return {
             id: parseInt(tray.tray_id !== undefined ? tray.tray_id : tray.id),
             color: `#${rawColor.substring(0, 6)}`, // Force the # and grab the first 6 characters
             type: tray.tray_type || tray.type || 'Empty',
-            gramsUsed: tray.grams_used || 0
+            gramsUsed,
+            gramsRemaining,
+            rfidDetected
           };
         });
         setAmsTrays(mappedData);
@@ -35,49 +252,315 @@ export default function App() {
   // If the database has data for that slot, use it. Otherwise, show it as Empty.
   const displaySlots = [0, 1, 2, 3].map(targetId => {
     const existingData = amsTrays.find(t => t.id === targetId);
-    return existingData || { id: targetId, color: '#1e293b', type: 'Empty', gramsUsed: 0 };
+    return existingData || { id: targetId, color: '#1e293b', type: 'Empty', gramsUsed: -1, gramsRemaining: null, rfidDetected: false };
   });
 
+  const totalRemaining = displaySlots.reduce((sum, slot) => sum + (typeof slot.gramsRemaining === 'number' ? slot.gramsRemaining : 0), 0);
+  const totalUsed = displaySlots.reduce((sum, slot) => sum + (typeof slot.gramsUsed === 'number' && slot.gramsUsed >= 0 ? slot.gramsUsed : 0), 0);
+  const totalInventoryCost = inventory.reduce((sum, spool) => sum + (typeof spool.cost === 'number' ? spool.cost : 0), 0);
+
   return (
-    <div className="min-h-screen bg-slate-900 text-white p-8">
-      <header className="mb-8 flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">PandaPrintsDash</h1>
-          <p className="text-slate-400 mt-1">Live Filament Tracking</p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 text-white px-4 py-6 sm:px-6 sm:py-8">
+      <div className="mx-auto w-full max-w-7xl xl:max-w-8xl">
+        <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight sm:text-4xl">Panda Prints Dashboard</h1>
+            <p className="text-slate-300 mt-1 text-sm sm:text-base">Live Filament Tracking for your Panda Prints setup</p>
+          </div>
+          <div className={`inline-flex items-center rounded-full px-4 py-2 text-xs font-semibold sm:text-sm ${connectionStatus.includes('Connected') ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}`}>
+            {connectionStatus}
+          </div>
+        </header>
+
+        <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-4">
+          <div className="rounded-xl border border-slate-700/70 bg-slate-800/70 p-3 text-sm">
+            <p className="text-slate-400">Total Remaining</p>
+            <p className="text-lg font-semibold text-emerald-300">{totalRemaining.toFixed(1)}g</p>
+          </div>
+          <div className="rounded-xl border border-slate-700/70 bg-slate-800/70 p-3 text-sm">
+            <p className="text-slate-400">Total Used</p>
+            <p className="text-lg font-semibold text-amber-300">{totalUsed.toFixed(1)}g</p>
+          </div>
+          <div className="rounded-xl border border-slate-700/70 bg-slate-800/70 p-3 text-sm">
+            <p className="text-slate-400">Tracked Slots</p>
+            <p className="text-lg font-semibold text-slate-100">{displaySlots.filter(s => s.type !== 'Empty').length}/4</p>
+          </div>
+          <div className="rounded-xl border border-slate-700/70 bg-slate-800/70 p-3 text-sm">
+            <p className="text-slate-400">Total Inventory Cost</p>
+            <p className="text-lg font-semibold text-blue-300">£{totalInventoryCost.toFixed(2)}</p>
+          </div>
         </div>
-        <div className={`px-4 py-2 rounded-full text-sm font-semibold ${connectionStatus.includes('Connected') ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-          {connectionStatus}
-        </div>
-      </header>
-      <main>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {displaySlots.map((tray) => (
-            <div key={tray.id} className="bg-slate-800 rounded-xl p-6 border border-slate-700 shadow-lg flex flex-col items-center">
-              <h2 className="text-xl font-semibold mb-4 text-slate-300">Slot {tray.id + 1}</h2>
-              <div 
-                className="w-32 h-32 rounded-full border-8 border-slate-600 shadow-inner flex items-center justify-center mb-6 relative overflow-hidden transition-colors duration-500" 
-                style={{ backgroundColor: tray.color }}
-              >
-                <div className="w-12 h-12 bg-slate-900 rounded-full border-4 border-slate-700 z-10"></div>
-              </div>
-              <div className="w-full space-y-2">
-                <div className="flex justify-between bg-slate-900/50 p-3 rounded-lg">
-                  <span className="text-slate-400">Material</span>
-                  <span className="font-mono font-bold">{tray.type}</span>
-                </div>
-                <div className="flex justify-between bg-slate-900/50 p-3 rounded-lg">
-                  <span className="text-slate-400">Used</span>
-                  <span className="font-mono text-sm flex items-center">
-                    {tray.gramsUsed === -1 
-                      ? <span className="text-slate-500 text-xs">No RFID</span> 
-                      : `${parseFloat(tray.gramsUsed).toFixed(1)}g`}
+
+        <section className="mb-6 rounded-xl border border-slate-700/70 bg-slate-800/70 p-4">
+          <div className="mb-4 rounded-xl border border-slate-700/70 bg-slate-900/50 p-3">
+            <h3 className="text-sm font-semibold text-slate-200 mb-2">Bambu store fetch</h3>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <input value={newSpool.store_url} onChange={(e) => setNewSpool((prev) => ({ ...prev, store_url: e.target.value }))} placeholder="Bambu store URL" className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" />
+              <button onClick={fetchSpoolFromUrl} className="rounded bg-blue-500 px-2 py-1 text-sm font-semibold text-white hover:bg-blue-400">Fetch Bambu Info</button>
+            </div>
+          </div>
+
+          <h2 className="text-lg font-semibold mb-3">Spool Inventory</h2>
+
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4 mb-4">
+            <input value={newSpool.brand} onChange={(e) => setNewSpool((prev) => ({ ...prev, brand: e.target.value }))} placeholder="Brand" className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" />
+            <select value={newSpool.material} onChange={(e) => setNewSpool((prev) => ({ ...prev, material: e.target.value }))} className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm">
+              <option value="">Select Material</option>
+              <option value="PLA">PLA</option>
+              <option value="PETG">PETG</option>
+              <option value="ABS">ABS</option>
+              <option value="TPU">TPU</option>
+              <option value="Nylon">Nylon</option>
+              <option value="PC">PC</option>
+              <option value="ASA">ASA</option>
+              <option value="PVA">PVA</option>
+              <option value="Other">Other</option>
+            </select>
+            <input type="number" min="0" value={newSpool.total_grams} onChange={(e) => setNewSpool((prev) => ({ ...prev, total_grams: e.target.value }))} placeholder="Total grams" className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" />
+            <input type="number" min="0" value={newSpool.remaining_grams} onChange={(e) => setNewSpool((prev) => ({ ...prev, remaining_grams: e.target.value }))} placeholder="Remaining grams" className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" />
+            <input value={newSpool.color} onChange={(e) => setNewSpool((prev) => ({ ...prev, color: e.target.value }))} placeholder="Colour" className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" />
+            <input value={newSpool.supplier} onChange={(e) => setNewSpool((prev) => ({ ...prev, supplier: e.target.value }))} placeholder="Supplier" className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" />
+            <input value={newSpool.cost} onChange={(e) => setNewSpool((prev) => ({ ...prev, cost: e.target.value }))} placeholder="Cost" type="number" min="0" step="0.01" className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" />
+            <input value={newSpool.purchase_url} onChange={(e) => setNewSpool((prev) => ({ ...prev, purchase_url: e.target.value }))} placeholder="Purchase URL" className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" />
+            <div className="mt-1">
+              <label className="block text-sm text-slate-200">With Spool</label>
+              <select value={newSpool.with_spool} onChange={(e) => setNewSpool((prev) => ({ ...prev, with_spool: e.target.value }))} className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm">
+                <option>No</option>
+                <option>Yes</option>
+              </select>
+            </div>
+            <div className="mt-1">
+              <label className="block text-sm text-slate-200">RFID</label>
+              <select value={newSpool.rfid} onChange={(e) => setNewSpool((prev) => ({ ...prev, rfid: e.target.value }))} className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm">
+                <option>No</option>
+                <option>Yes</option>
+              </select>
+            </div>
+            <button onClick={async () => {
+              await addSpool({
+                spool_id: newSpool.spool_id || null,
+                brand: newSpool.brand || null,
+                material: newSpool.material || null,
+                tray_id: newSpool.tray_id ? parseInt(newSpool.tray_id, 10) : null,
+                with_spool: newSpool.with_spool === 'Yes' ? 1 : 0,
+                color: newSpool.color || null,
+                type: newSpool.type || null,
+                rfid: newSpool.rfid === 'Yes' ? 'Yes' : 'No',
+                supplier: newSpool.supplier || null,
+                cost: newSpool.cost ? parseFloat(newSpool.cost) : null,
+                purchase_url: newSpool.purchase_url || null,
+                total_grams: newSpool.total_grams ? parseFloat(newSpool.total_grams) : 1000,
+                remaining_grams: newSpool.remaining_grams ? parseFloat(newSpool.remaining_grams) : null
+              });
+
+              setNewSpool({
+                spool_id: '',
+                brand: '',
+                material: '',
+                tray_id: '',
+                with_spool: 'No',
+                color: '',
+                type: '',
+                rfid: 'No',
+                supplier: '',
+                cost: '',
+                purchase_url: '',
+                total_grams: '',
+                remaining_grams: ''
+              });
+            }} className="rounded bg-emerald-500 px-3 py-2 text-sm font-semibold hover:bg-emerald-400">Add spool</button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left text-sm">
+              <thead>
+                <tr className="bg-slate-900">
+                  <th className="px-2 py-2">Brand</th>
+                  <th className="px-2 py-2">Material</th>
+                  <th className="px-2 py-2">With Spool</th>
+                  <th className="px-2 py-2">Colour</th>
+                  <th className="px-2 py-2">RFID</th>
+                  <th className="px-2 py-2">Supplier</th>
+                  <th className="px-2 py-2">Cost</th>
+                  <th className="px-2 py-2">Purchase URL</th>
+                  <th className="px-2 py-2">Tray</th>
+                  <th className="px-2 py-2">Total</th>
+                  <th className="px-2 py-2">Remaining</th>
+                  <th className="px-2 py-2">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {inventory.map((spool) => (
+                  <tr key={spool.id} className="border-t border-slate-700">
+                    <td className="px-2 py-1">
+                      {editingSpoolId === spool.id ? (
+                        <input className="w-full rounded border border-slate-700 bg-slate-900 px-1 py-1 text-xs" value={editedSpool.brand ?? ''} onChange={(e) => setEditedSpool((prev) => ({ ...prev, brand: e.target.value }))} />
+                      ) : spool.brand || '-'}
+                    </td>
+                    <td className="px-2 py-1">
+                      {editingSpoolId === spool.id ? (
+                        <input className="w-full rounded border border-slate-700 bg-slate-900 px-1 py-1 text-xs" value={editedSpool.material ?? ''} onChange={(e) => setEditedSpool((prev) => ({ ...prev, material: e.target.value }))} />
+                      ) : spool.material || '-'}
+                    </td>
+                    <td className="px-2 py-1">
+                      {editingSpoolId === spool.id ? (
+                        <select className="w-full rounded border border-slate-700 bg-slate-900 px-1 py-1 text-xs" value={editedSpool.with_spool ? 'Yes' : 'No'} onChange={(e) => setEditedSpool((prev) => ({ ...prev, with_spool: e.target.value === 'Yes' ? 1 : 0 }))}>
+                          <option>No</option>
+                          <option>Yes</option>
+                        </select>
+                      ) : (spool.with_spool ? 'Yes' : 'No')}
+                    </td>
+                    <td className="px-2 py-1">
+                      {editingSpoolId === spool.id ? (
+                        <input className="w-full rounded border border-slate-700 bg-slate-900 px-1 py-1 text-xs" value={editedSpool.color ?? ''} onChange={(e) => setEditedSpool((prev) => ({ ...prev, color: e.target.value }))} />
+                      ) : spool.color || '-'}
+                    </td>
+                    <td className="px-2 py-1">
+                      {editingSpoolId === spool.id ? (
+                        <select className="w-full rounded border border-slate-700 bg-slate-900 px-1 py-1 text-xs" value={editedSpool.rfid === 'Yes' ? 'Yes' : 'No'} onChange={(e) => setEditedSpool((prev) => ({ ...prev, rfid: e.target.value }))}>
+                          <option>No</option>
+                          <option>Yes</option>
+                        </select>
+                      ) : spool.rfid || 'No'}
+                    </td>
+                    <td className="px-2 py-1">
+                      {editingSpoolId === spool.id ? (
+                        <input className="w-full rounded border border-slate-700 bg-slate-900 px-1 py-1 text-xs" value={editedSpool.supplier ?? ''} onChange={(e) => setEditedSpool((prev) => ({ ...prev, supplier: e.target.value }))} />
+                      ) : spool.supplier || '-'}
+                    </td>
+                    <td className="px-2 py-1">
+                      {editingSpoolId === spool.id ? (
+                        <input type="number" step="0.01" className="w-full rounded border border-slate-700 bg-slate-900 px-1 py-1 text-xs" value={editedSpool.cost ?? ''} onChange={(e) => setEditedSpool((prev) => ({ ...prev, cost: e.target.value }))} />
+                      ) : (spool.cost !== null && spool.cost !== undefined ? `£${Number(spool.cost).toFixed(2)}` : '-')}
+                    </td>
+                    <td className="px-2 py-1">
+                      {editingSpoolId === spool.id ? (
+                        <input className="w-full rounded border border-slate-700 bg-slate-900 px-1 py-1 text-xs" value={editedSpool.purchase_url ?? ''} onChange={(e) => setEditedSpool((prev) => ({ ...prev, purchase_url: e.target.value }))} />
+                      ) : (spool.purchase_url ? <a className="text-indigo-300" href={spool.purchase_url} target="_blank" rel="noreferrer">Link</a> : '-')}
+                    </td>
+                    <td className="px-2 py-1">{spool.tray_id !== null && spool.tray_id !== undefined ? spool.tray_id + 1 : '-'}</td>
+                    <td className="px-2 py-1">
+                      {editingSpoolId === spool.id ? (
+                        <input type="number" className="w-full rounded border border-slate-700 bg-slate-900 px-1 py-1 text-xs" value={editedSpool.total_grams ?? ''} onChange={(e) => setEditedSpool((prev) => ({ ...prev, total_grams: e.target.value }))} />
+                      ) : (spool.total_grams ?? '-')}
+                    </td>
+                    <td className="px-2 py-1">
+                      {editingSpoolId === spool.id ? (
+                        <input type="number" className="w-full rounded border border-slate-700 bg-slate-900 px-1 py-1 text-xs" value={editedSpool.remaining_grams ?? ''} onChange={(e) => setEditedSpool((prev) => ({ ...prev, remaining_grams: e.target.value }))} />
+                      ) : (spool.remaining_grams ?? '-')}
+                    </td>
+                    <td className="px-2 py-1">
+                      {editingSpoolId === spool.id ? (
+                        <div className="flex gap-1">
+                          <button onClick={() => updateSpool(spool.id, editedSpool)} className="rounded bg-emerald-500 px-2 py-1 text-xs">Save</button>
+                          <button onClick={() => { setEditingSpoolId(null); setEditedSpool(null); }} className="rounded bg-slate-600 px-2 py-1 text-xs">Cancel</button>
+                        </div>
+                      ) : (
+                        <div className="flex gap-1">
+                          <button onClick={() => { setEditingSpoolId(spool.id); setEditedSpool(spool); }} className="rounded bg-blue-500 px-2 py-1 text-xs">Edit</button>
+                          <button onClick={() => deleteSpool(spool.id)} className="rounded bg-rose-500 px-2 py-1 text-xs">Remove</button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {inventory.length === 0 && (
+                  <tr>
+                    <td colSpan="6" className="px-2 py-3 text-center text-slate-400">No spools in inventory yet.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <main>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {displaySlots.map((tray) => (
+              <article key={tray.id} className="rounded-2xl border border-slate-700/70 bg-slate-800/80 p-5 shadow-[0_12px_22px_-10px_rgba(15,23,42,0.75)] backdrop-blur transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_18px_30px_-10px_rgba(15,23,42,0.8)]">
+                <h2 className="mb-3 text-lg font-semibold text-slate-100">Slot {tray.id + 1}</h2>
+                <div className="mb-5 flex flex-col items-center justify-center gap-2">
+                  <div
+                    className="relative flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border-8 border-slate-600 shadow-inner transition-all duration-500"
+                    style={{ backgroundColor: tray.color }}
+                    aria-label={`Color preview for slot ${tray.id + 1}`}>
+                    <div className="absolute inset-0 bg-black/20" />
+                    <div className="relative z-10 h-12 w-12 rounded-full border-4 border-slate-700 bg-slate-900" />
+                  </div>
+                  <span className="text-xs text-slate-300">
+                    {getColorNameFromHex(tray.color) || tray.color || 'Unknown'}
+                    {!tray.rfidDetected && tray.type !== 'Empty' ? ' (No RFID)' : ''}
                   </span>
                 </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </main>
+
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center justify-between rounded-lg bg-slate-900/50 px-3 py-2">
+                    <span className="text-slate-400">Material</span>
+                    <span className="font-mono font-bold text-slate-100">{tray.type}</span>
+                  </div>
+                  <div className="flex items-center justify-between rounded-lg bg-slate-900/50 px-3 py-2">
+                    <span className="text-slate-400">Used</span>
+                    <span className="font-mono text-slate-100">
+                      {!tray.rfidDetected
+                        ? <span className="text-slate-400 text-xs">No RFID</span>
+                        : `${parseFloat(tray.gramsUsed).toFixed(1)}g`}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between rounded-lg bg-slate-900/50 px-3 py-2">
+                    <span className="text-slate-400">Remaining</span>
+                    <span className="font-mono text-slate-100">
+                      {tray.gramsRemaining === null || tray.gramsRemaining === undefined
+                        ? <span className="text-slate-400 text-xs">Unknown</span>
+                        : `${parseFloat(tray.gramsRemaining).toFixed(1)}g`}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 flex items-center gap-2">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      placeholder="Remaining g"
+                      className="w-2/3 rounded-lg border border-slate-700 bg-slate-900 px-2 py-1 text-sm text-slate-100 outline-none focus:border-emerald-300"
+                      value={manualStock[tray.id] ?? ''}
+                      onChange={(e) => setManualStock(prev => ({ ...prev, [tray.id]: e.target.value }))}
+                    />
+                    <button
+                      onClick={() => updateStock(tray.id)}
+                      className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-500"
+                    >
+                      Save
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex justify-center">
+                  <button
+                    onClick={async () => {
+                      const colorName = getColorNameFromHex(tray.color) || tray.color;
+                      await addSpool({
+                        name: `${tray.type} #${tray.id + 1}`,
+                        tray_id: tray.id,
+                        color: colorName,
+                        type: tray.type,
+                        total_grams: null,
+                        remaining_grams: tray.gramsRemaining !== null ? Number(tray.gramsRemaining) : null
+                      });
+                    }}
+                    className="rounded bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-500"
+                  >
+                    Add to inventory
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+
+          <footer className="mt-6 rounded-xl border border-slate-700/70 bg-slate-900/40 p-4 text-center text-xs text-slate-400">
+            Best experience on mobile or desktop. Pull-to-refresh on mobile when the websocket isn’t live.
+          </footer>
+        </main>
+      </div>
     </div>
   );
 }

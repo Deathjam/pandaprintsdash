@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^cd /home/philw/projects/pandaprintsdash && sudo docker compose run --rm backend sh -c 'node -e \"require\\(\\\\\"sqlite3\\\\\"\\)\\.verbose\\(\\);require\\(\\\\\"mqtt\\\\\"\\);require\\(\\\\\"ws\\\\\"\\);require\\(\\\\\"express\\\\\"\\);console\\.log\\(\\\\\"ok\\\\\"\\);\"'$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}
