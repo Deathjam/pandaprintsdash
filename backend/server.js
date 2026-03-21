@@ -164,6 +164,24 @@ const broadcastDbState = () => {
   });
 };
 
+const syncAssignedSpoolFromTray = (trayId, gramsRemaining) => {
+  if (gramsRemaining === null || gramsRemaining === undefined || Number.isNaN(gramsRemaining)) {
+    return;
+  }
+
+  db.run(
+    `UPDATE spool_inventory
+       SET remaining_grams = ?,
+           total_grams = COALESCE(total_grams, 1000),
+           last_updated = CURRENT_TIMESTAMP
+     WHERE tray_id = ?`,
+    [gramsRemaining, trayId],
+    (err) => {
+      if (err) console.error('spool sync from tray error:', err);
+    }
+  );
+};
+
 // --- MQTT Logic ---
 const mqttClient = mqtt.connect(`mqtts://${PRINTER_IP}:8883`, {
   username: 'bblp', password: PRINTER_ACCESS_CODE, rejectUnauthorized: false
@@ -245,6 +263,7 @@ mqttClient.on('message', (topic, message) => {
             db.run(`UPDATE ams_state SET color = ?, type = ?, grams_used = ?, grams_remaining = ?, rfid_detected = ?, last_updated = CURRENT_TIMESTAMP WHERE tray_id = ?`, 
               [color, type, effectiveGramsUsed, effectiveGramsRemaining, effectiveRfidDetected, tray.id], (updateErr) => {
                 if (updateErr) console.error('AMS update error:', updateErr);
+                syncAssignedSpoolFromTray(tray.id, effectiveGramsRemaining);
               });
           });
         });
@@ -306,6 +325,7 @@ app.post('/api/ams/:trayId/stock', (req, res) => {
         [values.color, values.type, values.grams_used, values.grams_remaining, values.rfid_detected, trayId],
         function (updateErr) {
           if (updateErr) return res.status(500).json({ error: 'update failed' });
+          syncAssignedSpoolFromTray(trayId, values.grams_remaining);
           broadcastDbState();
           return res.json({ tray_id: trayId, ...values });
         }
@@ -316,6 +336,7 @@ app.post('/api/ams/:trayId/stock', (req, res) => {
         [trayId, values.color, values.type, values.grams_used, values.grams_remaining, values.rfid_detected],
         function (insertErr) {
           if (insertErr) return res.status(500).json({ error: 'insert failed' });
+          syncAssignedSpoolFromTray(trayId, values.grams_remaining);
           broadcastDbState();
           return res.json({ tray_id: trayId, ...values });
         }
@@ -335,6 +356,60 @@ app.get('/api/ams_state', (req, res) => {
   db.all('SELECT * FROM ams_state ORDER BY tray_id ASC', [], (err, rows) => {
     if (err) return res.status(500).json({ error: 'database error' });
     res.json(rows);
+  });
+});
+
+app.post('/api/ams/:trayId/assign-spool', (req, res) => {
+  const trayId = parseInt(req.params.trayId, 10);
+  const spoolId = parseInt(req.body?.spoolId, 10);
+
+  if (Number.isNaN(trayId) || Number.isNaN(spoolId)) {
+    return res.status(400).json({ error: 'trayId and spoolId must be numbers' });
+  }
+
+  db.get('SELECT * FROM spool_inventory WHERE id = ?', [spoolId], (err, spool) => {
+    if (err) return res.status(500).json({ error: 'database error' });
+    if (!spool) return res.status(404).json({ error: 'spool not found' });
+
+    db.get('SELECT grams_remaining FROM ams_state WHERE tray_id = ?', [trayId], (amsErr, tray) => {
+      if (amsErr) return res.status(500).json({ error: 'database error' });
+
+      const trayRemaining = tray && tray.grams_remaining !== undefined ? tray.grams_remaining : null;
+
+      db.run('UPDATE spool_inventory SET tray_id = NULL, last_updated = CURRENT_TIMESTAMP WHERE tray_id = ? AND id <> ?', [trayId, spoolId], (clearErr) => {
+        if (clearErr) return res.status(500).json({ error: 'database error' });
+
+        db.run(
+          `UPDATE spool_inventory
+             SET tray_id = ?,
+                 total_grams = COALESCE(total_grams, 1000),
+                 remaining_grams = COALESCE(?, remaining_grams),
+                 last_updated = CURRENT_TIMESTAMP
+           WHERE id = ?`,
+          [trayId, trayRemaining, spoolId],
+          function (assignErr) {
+            if (assignErr) return res.status(500).json({ error: 'database error' });
+
+            db.get('SELECT * FROM spool_inventory WHERE id = ?', [spoolId], (selErr, row) => {
+              if (selErr) return res.status(500).json({ error: 'database error' });
+              res.json(row);
+            });
+          }
+        );
+      });
+    });
+  });
+});
+
+app.post('/api/ams/:trayId/unassign-spool', (req, res) => {
+  const trayId = parseInt(req.params.trayId, 10);
+  if (Number.isNaN(trayId)) {
+    return res.status(400).json({ error: 'trayId must be a number' });
+  }
+
+  db.run('UPDATE spool_inventory SET tray_id = NULL, last_updated = CURRENT_TIMESTAMP WHERE tray_id = ?', [trayId], function (err) {
+    if (err) return res.status(500).json({ error: 'database error' });
+    res.json({ unassigned: this.changes });
   });
 });
 

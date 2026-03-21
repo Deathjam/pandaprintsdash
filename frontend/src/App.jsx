@@ -5,6 +5,7 @@ export default function App() {
   const [connectionStatus, setConnectionStatus] = useState('Connecting...');
   const [manualStock, setManualStock] = useState({});
   const [inventory, setInventory] = useState([]);
+  const [slotSpoolSelection, setSlotSpoolSelection] = useState({});
 
   const hexToColorName = {
     '#FFFFFF': 'Jade White',
@@ -185,6 +186,34 @@ export default function App() {
     }
   };
 
+  const assignSpoolToTray = async (trayId, spoolId) => {
+    if (!spoolId) return;
+    try {
+      const res = await fetch(`/api/ams/${trayId}/assign-spool`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ spoolId: Number(spoolId) }),
+      });
+      if (!res.ok) throw new Error('assign spool failed');
+      await loadInventory();
+    } catch (e) {
+      console.error('assignSpoolToTray error', e);
+    }
+  };
+
+  const unassignSpoolFromTray = async (trayId) => {
+    try {
+      const res = await fetch(`/api/ams/${trayId}/unassign-spool`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) throw new Error('unassign spool failed');
+      await loadInventory();
+    } catch (e) {
+      console.error('unassignSpoolFromTray error', e);
+    }
+  };
+
   const loadAmsState = async () => {
     try {
       const res = await fetch('/api/ams_state');
@@ -304,6 +333,7 @@ export default function App() {
           <h2 className="text-lg font-semibold mb-3">Spool Inventory</h2>
 
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4 mb-4">
+            <input value={newSpool.spool_id} onChange={(e) => setNewSpool((prev) => ({ ...prev, spool_id: e.target.value }))} placeholder="Spool ID (e.g. SPOOL-01)" className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" />
             <input value={newSpool.brand} onChange={(e) => setNewSpool((prev) => ({ ...prev, brand: e.target.value }))} placeholder="Brand" className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" />
             <select value={newSpool.material} onChange={(e) => setNewSpool((prev) => ({ ...prev, material: e.target.value }))} className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm">
               <option value="">Select Material</option>
@@ -367,7 +397,8 @@ export default function App() {
                 cost: '',
                 purchase_url: '',
                 total_grams: '',
-                remaining_grams: ''
+                remaining_grams: '',
+                store_url: ''
               });
             }} className="rounded bg-emerald-500 px-3 py-2 text-sm font-semibold hover:bg-emerald-400">Add spool</button>
           </div>
@@ -376,6 +407,7 @@ export default function App() {
             <table className="min-w-full text-left text-sm">
               <thead>
                 <tr className="bg-slate-900">
+                  <th className="px-2 py-2">Spool ID</th>
                   <th className="px-2 py-2">Brand</th>
                   <th className="px-2 py-2">Material</th>
                   <th className="px-2 py-2">With Spool</th>
@@ -393,6 +425,11 @@ export default function App() {
               <tbody>
                 {inventory.map((spool) => (
                   <tr key={spool.id} className="border-t border-slate-700">
+                    <td className="px-2 py-1">
+                      {editingSpoolId === spool.id ? (
+                        <input className="w-full rounded border border-slate-700 bg-slate-900 px-1 py-1 text-xs" value={editedSpool.spool_id ?? ''} onChange={(e) => setEditedSpool((prev) => ({ ...prev, spool_id: e.target.value }))} />
+                      ) : (spool.spool_id || '-')}
+                    </td>
                     <td className="px-2 py-1">
                       {editingSpoolId === spool.id ? (
                         <input className="w-full rounded border border-slate-700 bg-slate-900 px-1 py-1 text-xs" value={editedSpool.brand ?? ''} onChange={(e) => setEditedSpool((prev) => ({ ...prev, brand: e.target.value }))} />
@@ -467,7 +504,7 @@ export default function App() {
                 ))}
                 {inventory.length === 0 && (
                   <tr>
-                    <td colSpan="6" className="px-2 py-3 text-center text-slate-400">No spools in inventory yet.</td>
+                    <td colSpan="13" className="px-2 py-3 text-center text-slate-400">No spools in inventory yet.</td>
                   </tr>
                 )}
               </tbody>
@@ -479,6 +516,41 @@ export default function App() {
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {displaySlots.map((tray) => (
               <article key={tray.id} className="rounded-2xl border border-slate-700/70 bg-slate-800/80 p-5 shadow-[0_12px_22px_-10px_rgba(15,23,42,0.75)] backdrop-blur transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_18px_30px_-10px_rgba(15,23,42,0.8)]">
+                {(() => {
+                  const currentSpool = inventory.find((spool) => spool.tray_id === tray.id);
+                  const selectableSpools = inventory.filter((spool) => spool.tray_id === null || spool.tray_id === undefined || spool.tray_id === tray.id);
+                  return (
+                    <div className="mb-3 rounded-lg bg-slate-900/50 p-2 text-xs text-slate-300">
+                      <p className="mb-1">Assigned Spool ID: <span className="font-semibold text-slate-100">{currentSpool ? (currentSpool.spool_id || currentSpool.name || `Spool ${currentSpool.id}`) : 'None'}</span></p>
+                      <div className="flex gap-2">
+                        <select
+                          className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs"
+                          value={slotSpoolSelection[tray.id] ?? ''}
+                          onChange={(e) => setSlotSpoolSelection((prev) => ({ ...prev, [tray.id]: e.target.value }))}
+                        >
+                          <option value="">Select Spool ID</option>
+                          {selectableSpools.map((spool) => (
+                            <option key={spool.id} value={spool.id}>
+                              {(spool.spool_id || `Spool ${spool.id}`)} - {spool.brand || spool.material || 'Unbranded'}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={() => assignSpoolToTray(tray.id, slotSpoolSelection[tray.id])}
+                          className="rounded bg-emerald-600 px-2 py-1 text-xs font-semibold text-white hover:bg-emerald-500"
+                        >
+                          Load
+                        </button>
+                        <button
+                          onClick={() => unassignSpoolFromTray(tray.id)}
+                          className="rounded bg-slate-600 px-2 py-1 text-xs font-semibold text-white hover:bg-slate-500"
+                        >
+                          Unload
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
                 <h2 className="mb-3 text-lg font-semibold text-slate-100">Slot {tray.id + 1}</h2>
                 <div className="mb-5 flex flex-col items-center justify-center gap-2">
                   <div
