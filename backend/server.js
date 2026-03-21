@@ -3,7 +3,14 @@ const WebSocket = require('ws');
 const sqlite3 = require('sqlite3').verbose();
 const express = require('express');
 
-const { PRINTER_IP, PRINTER_SERIAL, PRINTER_ACCESS_CODE, PORT = 3001, WS_PORT = 8080 } = process.env;
+const {
+  PRINTER_IP,
+  PRINTER_SERIAL,
+  PRINTER_ACCESS_CODE,
+  PORT = 3001,
+  WS_PORT = 8080,
+  AMS_ASSIGN_SYNC_GRACE_MS = 15000
+} = process.env;
 
 // Initialize SQLite
 const db = new sqlite3.Database('./data/pandaprints.db');
@@ -149,6 +156,13 @@ ensureAmsStateSchema();
 // Initialize WebSockets
 const wss = new WebSocket.Server({ port: WS_PORT });
 let clients = [];
+const traySyncPauseUntil = new Map();
+
+const pauseTraySync = (trayId, durationMs = Number(AMS_ASSIGN_SYNC_GRACE_MS)) => {
+  const ms = Number.isFinite(Number(durationMs)) ? Math.max(0, Number(durationMs)) : 0;
+  if (ms <= 0) return;
+  traySyncPauseUntil.set(trayId, Date.now() + ms);
+};
 
 wss.on('connection', (ws) => {
   clients.push(ws);
@@ -164,9 +178,20 @@ const broadcastDbState = () => {
   });
 };
 
-const syncAssignedSpoolFromTray = (trayId, gramsRemaining) => {
+const syncAssignedSpoolFromTray = (trayId, gramsRemaining, options = {}) => {
+  const { force = false } = options;
   if (gramsRemaining === null || gramsRemaining === undefined || Number.isNaN(gramsRemaining)) {
     return;
+  }
+
+  if (!force) {
+    const pauseUntil = traySyncPauseUntil.get(trayId);
+    if (pauseUntil && Date.now() < pauseUntil) {
+      return;
+    }
+    if (pauseUntil && Date.now() >= pauseUntil) {
+      traySyncPauseUntil.delete(trayId);
+    }
   }
 
   db.run(
@@ -325,7 +350,7 @@ app.post('/api/ams/:trayId/stock', (req, res) => {
         [values.color, values.type, values.grams_used, values.grams_remaining, values.rfid_detected, trayId],
         function (updateErr) {
           if (updateErr) return res.status(500).json({ error: 'update failed' });
-          syncAssignedSpoolFromTray(trayId, values.grams_remaining);
+          syncAssignedSpoolFromTray(trayId, values.grams_remaining, { force: true });
           broadcastDbState();
           return res.json({ tray_id: trayId, ...values });
         }
@@ -336,7 +361,7 @@ app.post('/api/ams/:trayId/stock', (req, res) => {
         [trayId, values.color, values.type, values.grams_used, values.grams_remaining, values.rfid_detected],
         function (insertErr) {
           if (insertErr) return res.status(500).json({ error: 'insert failed' });
-          syncAssignedSpoolFromTray(trayId, values.grams_remaining);
+          syncAssignedSpoolFromTray(trayId, values.grams_remaining, { force: true });
           broadcastDbState();
           return res.json({ tray_id: trayId, ...values });
         }
@@ -389,6 +414,9 @@ app.post('/api/ams/:trayId/assign-spool', (req, res) => {
           [trayId, trayRemaining, spoolId],
           function (assignErr) {
             if (assignErr) return res.status(500).json({ error: 'database error' });
+
+            // Give time for physical swap before AMS auto-sync updates remaining grams.
+            pauseTraySync(trayId);
 
             db.get('SELECT * FROM spool_inventory WHERE id = ?', [spoolId], (selErr, row) => {
               if (selErr) return res.status(500).json({ error: 'database error' });

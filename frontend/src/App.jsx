@@ -621,7 +621,7 @@ export default function App() {
                           <option value="">Select Spool ID</option>
                           {selectableSpools.map((spool) => (
                             <option key={spool.id} value={spool.id}>
-                              {(spool.spool_id || `Spool ${spool.id}`)} - {spool.brand || spool.material || 'Unbranded'}
+                              {(spool.spool_id || `Spool ${spool.id}`)} - {(spool.material || 'Unknown Material')} - {(spool.color || 'Unknown Colour')}
                             </option>
                           ))}
                         </select>
