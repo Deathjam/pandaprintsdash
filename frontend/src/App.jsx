@@ -333,7 +333,7 @@ export default function App() {
           <h2 className="text-lg font-semibold mb-3">Spool Inventory</h2>
 
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4 mb-4">
-            <input value={newSpool.spool_id} onChange={(e) => setNewSpool((prev) => ({ ...prev, spool_id: e.target.value }))} placeholder="Spool ID (e.g. SPOOL-01)" className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" />
+            <input value={newSpool.spool_id} onChange={(e) => setNewSpool((prev) => ({ ...prev, spool_id: e.target.value }))} placeholder="Spool ID (e.g. 0001)" className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" />
             <input value={newSpool.brand} onChange={(e) => setNewSpool((prev) => ({ ...prev, brand: e.target.value }))} placeholder="Brand" className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" />
             <select value={newSpool.material} onChange={(e) => setNewSpool((prev) => ({ ...prev, material: e.target.value }))} className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm">
               <option value="">Select Material</option>
