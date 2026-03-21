@@ -5,6 +5,7 @@ export default function App() {
   const [connectionStatus, setConnectionStatus] = useState('Connecting...');
   const [manualStock, setManualStock] = useState({});
   const [inventory, setInventory] = useState([]);
+  const [inventoryFilters, setInventoryFilters] = useState({ inAms: false, low: false, empty: false });
   const [slotSpoolSelection, setSlotSpoolSelection] = useState({});
 
   const hexToColorName = {
@@ -289,10 +290,28 @@ export default function App() {
   const totalUsed = displaySlots.reduce((sum, slot) => sum + (typeof slot.gramsUsed === 'number' && slot.gramsUsed >= 0 ? slot.gramsUsed : 0), 0);
   const totalInventoryCost = inventory.reduce((sum, spool) => sum + (typeof spool.cost === 'number' ? spool.cost : 0), 0);
 
+  const getSpoolFlags = (spool) => {
+    const totalNum = spool.total_grams !== null && spool.total_grams !== undefined ? Number(spool.total_grams) : null;
+    const remainingNum = spool.remaining_grams !== null && spool.remaining_grams !== undefined ? Number(spool.remaining_grams) : null;
+    const inAms = spool.tray_id !== null && spool.tray_id !== undefined;
+    const isEmpty = remainingNum !== null && !Number.isNaN(remainingNum) && remainingNum <= 0;
+    const isLow = !isEmpty && remainingNum !== null && !Number.isNaN(remainingNum)
+      && (remainingNum <= 200 || (totalNum !== null && !Number.isNaN(totalNum) && totalNum > 0 && (remainingNum / totalNum) <= 0.2));
+    return { inAms, isLow, isEmpty };
+  };
+
+  const filteredInventory = inventory.filter((spool) => {
+    const flags = getSpoolFlags(spool);
+    if (inventoryFilters.inAms && !flags.inAms) return false;
+    if (inventoryFilters.low && !flags.isLow) return false;
+    if (inventoryFilters.empty && !flags.isEmpty) return false;
+    return true;
+  });
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 text-white px-4 py-6 sm:px-6 sm:py-8">
-      <div className="mx-auto w-full max-w-7xl xl:max-w-8xl">
-        <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 px-5 py-8 text-[15px] text-white sm:px-8 sm:py-10 sm:text-base">
+      <div className="mx-auto w-full max-w-[1800px]">
+        <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold tracking-tight sm:text-4xl">Panda Prints Dashboard</h1>
             <p className="text-slate-300 mt-1 text-sm sm:text-base">Live Filament Tracking for your Panda Prints setup</p>
@@ -302,67 +321,97 @@ export default function App() {
           </div>
         </header>
 
-        <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-4">
-          <div className="rounded-xl border border-slate-700/70 bg-slate-800/70 p-3 text-sm">
+        <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-4">
+          <div className="rounded-xl border border-slate-700/70 bg-slate-800/70 p-4 text-sm">
             <p className="text-slate-400">Total Remaining</p>
             <p className="text-lg font-semibold text-emerald-300">{totalRemaining.toFixed(1)}g</p>
           </div>
-          <div className="rounded-xl border border-slate-700/70 bg-slate-800/70 p-3 text-sm">
+          <div className="rounded-xl border border-slate-700/70 bg-slate-800/70 p-4 text-sm">
             <p className="text-slate-400">Total Used</p>
             <p className="text-lg font-semibold text-amber-300">{totalUsed.toFixed(1)}g</p>
           </div>
-          <div className="rounded-xl border border-slate-700/70 bg-slate-800/70 p-3 text-sm">
+          <div className="rounded-xl border border-slate-700/70 bg-slate-800/70 p-4 text-sm">
             <p className="text-slate-400">Tracked Slots</p>
             <p className="text-lg font-semibold text-slate-100">{displaySlots.filter(s => s.type !== 'Empty').length}/4</p>
           </div>
-          <div className="rounded-xl border border-slate-700/70 bg-slate-800/70 p-3 text-sm">
+          <div className="rounded-xl border border-slate-700/70 bg-slate-800/70 p-4 text-sm">
             <p className="text-slate-400">Total Inventory Cost</p>
             <p className="text-lg font-semibold text-blue-300">£{totalInventoryCost.toFixed(2)}</p>
           </div>
         </div>
 
-        <section className="mb-6 rounded-xl border border-slate-700/70 bg-slate-800/70 p-4">
-          <div className="mb-4 rounded-xl border border-slate-700/70 bg-slate-900/50 p-3">
-            <h3 className="text-sm font-semibold text-slate-200 mb-2">Bambu store fetch</h3>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-              <input value={newSpool.store_url} onChange={(e) => setNewSpool((prev) => ({ ...prev, store_url: e.target.value }))} placeholder="Bambu store URL" className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" />
-              <button onClick={fetchSpoolFromUrl} className="rounded bg-blue-500 px-2 py-1 text-sm font-semibold text-white hover:bg-blue-400">Fetch Bambu Info</button>
+        <section className="mb-8 rounded-xl border border-slate-700/70 bg-slate-800/70 p-6">
+          <div className="mb-5 rounded-xl border border-slate-700/70 bg-slate-900/50 p-4">
+            <h3 className="mb-2 text-base font-semibold text-slate-200">Bambu store fetch</h3>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-5">
+              <div className="sm:col-span-4">
+                <label className="mb-1 block text-sm text-slate-200">Bambu store URL</label>
+                <input value={newSpool.store_url} onChange={(e) => setNewSpool((prev) => ({ ...prev, store_url: e.target.value }))} placeholder="https://uk.store.bambulab.com/..." className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-base" />
+              </div>
+              <button onClick={fetchSpoolFromUrl} className="sm:col-span-1 w-full self-end rounded bg-blue-500 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-400">Fetch Bambu Info</button>
             </div>
           </div>
 
-          <h2 className="text-lg font-semibold mb-3">Spool Inventory</h2>
+          <h2 className="mb-4 text-xl font-semibold">Spool Inventory</h2>
 
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4 mb-4">
-            <input value={newSpool.spool_id} onChange={(e) => setNewSpool((prev) => ({ ...prev, spool_id: e.target.value }))} placeholder="Spool ID (e.g. 0001)" className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" />
-            <input value={newSpool.brand} onChange={(e) => setNewSpool((prev) => ({ ...prev, brand: e.target.value }))} placeholder="Brand" className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" />
-            <select value={newSpool.material} onChange={(e) => setNewSpool((prev) => ({ ...prev, material: e.target.value }))} className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm">
-              <option value="">Select Material</option>
-              <option value="PLA">PLA</option>
-              <option value="PETG">PETG</option>
-              <option value="ABS">ABS</option>
-              <option value="TPU">TPU</option>
-              <option value="Nylon">Nylon</option>
-              <option value="PC">PC</option>
-              <option value="ASA">ASA</option>
-              <option value="PVA">PVA</option>
-              <option value="Other">Other</option>
-            </select>
-            <input type="number" min="0" value={newSpool.total_grams} onChange={(e) => setNewSpool((prev) => ({ ...prev, total_grams: e.target.value }))} placeholder="Total grams" className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" />
-            <input type="number" min="0" value={newSpool.remaining_grams} onChange={(e) => setNewSpool((prev) => ({ ...prev, remaining_grams: e.target.value }))} placeholder="Remaining grams" className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" />
-            <input value={newSpool.color} onChange={(e) => setNewSpool((prev) => ({ ...prev, color: e.target.value }))} placeholder="Colour" className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" />
-            <input value={newSpool.supplier} onChange={(e) => setNewSpool((prev) => ({ ...prev, supplier: e.target.value }))} placeholder="Supplier" className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" />
-            <input value={newSpool.cost} onChange={(e) => setNewSpool((prev) => ({ ...prev, cost: e.target.value }))} placeholder="Cost" type="number" min="0" step="0.01" className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" />
-            <input value={newSpool.purchase_url} onChange={(e) => setNewSpool((prev) => ({ ...prev, purchase_url: e.target.value }))} placeholder="Purchase URL" className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" />
-            <div className="mt-1">
-              <label className="block text-sm text-slate-200">With Spool</label>
-              <select value={newSpool.with_spool} onChange={(e) => setNewSpool((prev) => ({ ...prev, with_spool: e.target.value }))} className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-5">
+            <div>
+              <label className="mb-1 block text-sm text-slate-200">Spool ID</label>
+              <input value={newSpool.spool_id} onChange={(e) => setNewSpool((prev) => ({ ...prev, spool_id: e.target.value }))} placeholder="e.g. 0001" className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-base" />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-slate-200">Brand</label>
+              <input value={newSpool.brand} onChange={(e) => setNewSpool((prev) => ({ ...prev, brand: e.target.value }))} placeholder="Brand" className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-base" />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-slate-200">Material</label>
+              <select value={newSpool.material} onChange={(e) => setNewSpool((prev) => ({ ...prev, material: e.target.value }))} className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-base">
+                <option value="">Select Material</option>
+                <option value="PLA">PLA</option>
+                <option value="PETG">PETG</option>
+                <option value="ABS">ABS</option>
+                <option value="TPU">TPU</option>
+                <option value="Nylon">Nylon</option>
+                <option value="PC">PC</option>
+                <option value="ASA">ASA</option>
+                <option value="PVA">PVA</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-slate-200">Total Grams</label>
+              <input type="number" min="0" value={newSpool.total_grams} onChange={(e) => setNewSpool((prev) => ({ ...prev, total_grams: e.target.value }))} placeholder="1000" className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-base" />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-slate-200">Remaining Grams</label>
+              <input type="number" min="0" value={newSpool.remaining_grams} onChange={(e) => setNewSpool((prev) => ({ ...prev, remaining_grams: e.target.value }))} placeholder="Remaining grams" className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-base" />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-slate-200">Colour</label>
+              <input value={newSpool.color} onChange={(e) => setNewSpool((prev) => ({ ...prev, color: e.target.value }))} placeholder="Colour" className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-base" />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-slate-200">Supplier</label>
+              <input value={newSpool.supplier} onChange={(e) => setNewSpool((prev) => ({ ...prev, supplier: e.target.value }))} placeholder="Supplier" className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-base" />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-slate-200">Cost</label>
+              <input value={newSpool.cost} onChange={(e) => setNewSpool((prev) => ({ ...prev, cost: e.target.value }))} placeholder="0.00" type="number" min="0" step="0.01" className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-base" />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-slate-200">Purchase URL</label>
+              <input value={newSpool.purchase_url} onChange={(e) => setNewSpool((prev) => ({ ...prev, purchase_url: e.target.value }))} placeholder="https://..." className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-base" />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm text-slate-200">With Spool</label>
+              <select value={newSpool.with_spool} onChange={(e) => setNewSpool((prev) => ({ ...prev, with_spool: e.target.value }))} className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-base">
                 <option>No</option>
                 <option>Yes</option>
               </select>
             </div>
-            <div className="mt-1">
-              <label className="block text-sm text-slate-200">RFID</label>
-              <select value={newSpool.rfid} onChange={(e) => setNewSpool((prev) => ({ ...prev, rfid: e.target.value }))} className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm">
+            <div>
+              <label className="mb-1 block text-sm text-slate-200">RFID</label>
+              <select value={newSpool.rfid} onChange={(e) => setNewSpool((prev) => ({ ...prev, rfid: e.target.value }))} className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-base">
                 <option>No</option>
                 <option>Yes</option>
               </select>
@@ -400,11 +449,42 @@ export default function App() {
                 remaining_grams: '',
                 store_url: ''
               });
-            }} className="rounded bg-emerald-500 px-3 py-2 text-sm font-semibold hover:bg-emerald-400">Add spool</button>
+            }} className="self-end rounded bg-emerald-500 px-3 py-2 text-sm font-semibold hover:bg-emerald-400">Add spool</button>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
+            <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
+              <span className="mr-1 text-slate-300">Filter:</span>
+              <button
+                type="button"
+                onClick={() => setInventoryFilters((prev) => ({ ...prev, inAms: !prev.inAms }))}
+                className={`rounded border px-2 py-1 ${inventoryFilters.inAms ? 'border-emerald-500 bg-emerald-700/40 text-emerald-100' : 'border-emerald-700/60 bg-emerald-900/20 text-emerald-200'}`}
+              >
+                Spools in AMS
+              </button>
+              <button
+                type="button"
+                onClick={() => setInventoryFilters((prev) => ({ ...prev, low: !prev.low }))}
+                className={`rounded border px-2 py-1 ${inventoryFilters.low ? 'border-amber-500 bg-amber-700/40 text-amber-100' : 'border-amber-700/60 bg-amber-900/25 text-amber-200'}`}
+              >
+                Spools Low
+              </button>
+              <button
+                type="button"
+                onClick={() => setInventoryFilters((prev) => ({ ...prev, empty: !prev.empty }))}
+                className={`rounded border px-2 py-1 ${inventoryFilters.empty ? 'border-rose-500 bg-rose-700/40 text-rose-100' : 'border-rose-700/60 bg-rose-900/30 text-rose-200'}`}
+              >
+                Spools Empty
+              </button>
+              <button
+                type="button"
+                onClick={() => setInventoryFilters({ inAms: false, low: false, empty: false })}
+                className="rounded border border-slate-600 bg-slate-800 px-2 py-1 text-slate-200 hover:bg-slate-700"
+              >
+                Clear Filters
+              </button>
+            </div>
+            <table className="min-w-full text-left text-base">
               <thead>
                 <tr className="bg-slate-900">
                   <th className="px-2 py-2">Spool ID</th>
@@ -416,33 +496,41 @@ export default function App() {
                   <th className="px-2 py-2">Supplier</th>
                   <th className="px-2 py-2">Cost</th>
                   <th className="px-2 py-2">Purchase URL</th>
-                  <th className="px-2 py-2">Tray</th>
+                  <th className="px-2 py-2">AMS Slot</th>
                   <th className="px-2 py-2">Total</th>
                   <th className="px-2 py-2">Remaining</th>
                   <th className="px-2 py-2">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {inventory.map((spool) => (
-                  <tr key={spool.id} className="border-t border-slate-700">
+                {filteredInventory.map((spool) => {
+                  const { inAms, isLow, isEmpty } = getSpoolFlags(spool);
+
+                  let rowHighlight = '';
+                  if (isEmpty) rowHighlight = 'bg-rose-900/30';
+                  else if (isLow) rowHighlight = 'bg-amber-900/25';
+                  else if (inAms) rowHighlight = 'bg-emerald-900/20';
+
+                  return (
+                  <tr key={spool.id} className={`border-t border-slate-700 ${rowHighlight}`}>
                     <td className="px-2 py-1">
                       {editingSpoolId === spool.id ? (
-                        <input className="w-full rounded border border-slate-700 bg-slate-900 px-1 py-1 text-xs" value={editedSpool.spool_id ?? ''} onChange={(e) => setEditedSpool((prev) => ({ ...prev, spool_id: e.target.value }))} />
+                        <input className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" value={editedSpool.spool_id ?? ''} onChange={(e) => setEditedSpool((prev) => ({ ...prev, spool_id: e.target.value }))} />
                       ) : (spool.spool_id || '-')}
                     </td>
                     <td className="px-2 py-1">
                       {editingSpoolId === spool.id ? (
-                        <input className="w-full rounded border border-slate-700 bg-slate-900 px-1 py-1 text-xs" value={editedSpool.brand ?? ''} onChange={(e) => setEditedSpool((prev) => ({ ...prev, brand: e.target.value }))} />
+                        <input className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" value={editedSpool.brand ?? ''} onChange={(e) => setEditedSpool((prev) => ({ ...prev, brand: e.target.value }))} />
                       ) : spool.brand || '-'}
                     </td>
                     <td className="px-2 py-1">
                       {editingSpoolId === spool.id ? (
-                        <input className="w-full rounded border border-slate-700 bg-slate-900 px-1 py-1 text-xs" value={editedSpool.material ?? ''} onChange={(e) => setEditedSpool((prev) => ({ ...prev, material: e.target.value }))} />
+                        <input className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" value={editedSpool.material ?? ''} onChange={(e) => setEditedSpool((prev) => ({ ...prev, material: e.target.value }))} />
                       ) : spool.material || '-'}
                     </td>
                     <td className="px-2 py-1">
                       {editingSpoolId === spool.id ? (
-                        <select className="w-full rounded border border-slate-700 bg-slate-900 px-1 py-1 text-xs" value={editedSpool.with_spool ? 'Yes' : 'No'} onChange={(e) => setEditedSpool((prev) => ({ ...prev, with_spool: e.target.value === 'Yes' ? 1 : 0 }))}>
+                        <select className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" value={editedSpool.with_spool ? 'Yes' : 'No'} onChange={(e) => setEditedSpool((prev) => ({ ...prev, with_spool: e.target.value === 'Yes' ? 1 : 0 }))}>
                           <option>No</option>
                           <option>Yes</option>
                         </select>
@@ -450,12 +538,12 @@ export default function App() {
                     </td>
                     <td className="px-2 py-1">
                       {editingSpoolId === spool.id ? (
-                        <input className="w-full rounded border border-slate-700 bg-slate-900 px-1 py-1 text-xs" value={editedSpool.color ?? ''} onChange={(e) => setEditedSpool((prev) => ({ ...prev, color: e.target.value }))} />
+                        <input className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" value={editedSpool.color ?? ''} onChange={(e) => setEditedSpool((prev) => ({ ...prev, color: e.target.value }))} />
                       ) : spool.color || '-'}
                     </td>
                     <td className="px-2 py-1">
                       {editingSpoolId === spool.id ? (
-                        <select className="w-full rounded border border-slate-700 bg-slate-900 px-1 py-1 text-xs" value={editedSpool.rfid === 'Yes' ? 'Yes' : 'No'} onChange={(e) => setEditedSpool((prev) => ({ ...prev, rfid: e.target.value }))}>
+                        <select className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" value={editedSpool.rfid === 'Yes' ? 'Yes' : 'No'} onChange={(e) => setEditedSpool((prev) => ({ ...prev, rfid: e.target.value }))}>
                           <option>No</option>
                           <option>Yes</option>
                         </select>
@@ -463,28 +551,28 @@ export default function App() {
                     </td>
                     <td className="px-2 py-1">
                       {editingSpoolId === spool.id ? (
-                        <input className="w-full rounded border border-slate-700 bg-slate-900 px-1 py-1 text-xs" value={editedSpool.supplier ?? ''} onChange={(e) => setEditedSpool((prev) => ({ ...prev, supplier: e.target.value }))} />
+                        <input className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" value={editedSpool.supplier ?? ''} onChange={(e) => setEditedSpool((prev) => ({ ...prev, supplier: e.target.value }))} />
                       ) : spool.supplier || '-'}
                     </td>
                     <td className="px-2 py-1">
                       {editingSpoolId === spool.id ? (
-                        <input type="number" step="0.01" className="w-full rounded border border-slate-700 bg-slate-900 px-1 py-1 text-xs" value={editedSpool.cost ?? ''} onChange={(e) => setEditedSpool((prev) => ({ ...prev, cost: e.target.value }))} />
+                        <input type="number" step="0.01" className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" value={editedSpool.cost ?? ''} onChange={(e) => setEditedSpool((prev) => ({ ...prev, cost: e.target.value }))} />
                       ) : (spool.cost !== null && spool.cost !== undefined ? `£${Number(spool.cost).toFixed(2)}` : '-')}
                     </td>
                     <td className="px-2 py-1">
                       {editingSpoolId === spool.id ? (
-                        <input className="w-full rounded border border-slate-700 bg-slate-900 px-1 py-1 text-xs" value={editedSpool.purchase_url ?? ''} onChange={(e) => setEditedSpool((prev) => ({ ...prev, purchase_url: e.target.value }))} />
+                        <input className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" value={editedSpool.purchase_url ?? ''} onChange={(e) => setEditedSpool((prev) => ({ ...prev, purchase_url: e.target.value }))} />
                       ) : (spool.purchase_url ? <a className="text-indigo-300" href={spool.purchase_url} target="_blank" rel="noreferrer">Link</a> : '-')}
                     </td>
                     <td className="px-2 py-1">{spool.tray_id !== null && spool.tray_id !== undefined ? spool.tray_id + 1 : '-'}</td>
                     <td className="px-2 py-1">
                       {editingSpoolId === spool.id ? (
-                        <input type="number" className="w-full rounded border border-slate-700 bg-slate-900 px-1 py-1 text-xs" value={editedSpool.total_grams ?? ''} onChange={(e) => setEditedSpool((prev) => ({ ...prev, total_grams: e.target.value }))} />
+                        <input type="number" className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" value={editedSpool.total_grams ?? ''} onChange={(e) => setEditedSpool((prev) => ({ ...prev, total_grams: e.target.value }))} />
                       ) : (spool.total_grams ?? '-')}
                     </td>
                     <td className="px-2 py-1">
                       {editingSpoolId === spool.id ? (
-                        <input type="number" className="w-full rounded border border-slate-700 bg-slate-900 px-1 py-1 text-xs" value={editedSpool.remaining_grams ?? ''} onChange={(e) => setEditedSpool((prev) => ({ ...prev, remaining_grams: e.target.value }))} />
+                        <input type="number" className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" value={editedSpool.remaining_grams ?? ''} onChange={(e) => setEditedSpool((prev) => ({ ...prev, remaining_grams: e.target.value }))} />
                       ) : (spool.remaining_grams ?? '-')}
                     </td>
                     <td className="px-2 py-1">
@@ -501,10 +589,10 @@ export default function App() {
                       )}
                     </td>
                   </tr>
-                ))}
-                {inventory.length === 0 && (
+                );})}
+                {filteredInventory.length === 0 && (
                   <tr>
-                    <td colSpan="13" className="px-2 py-3 text-center text-slate-400">No spools in inventory yet.</td>
+                    <td colSpan="13" className="px-2 py-3 text-center text-slate-400">No spools match the current filter.</td>
                   </tr>
                 )}
               </tbody>
@@ -523,8 +611,10 @@ export default function App() {
                     <div className="mb-3 rounded-lg bg-slate-900/50 p-2 text-xs text-slate-300">
                       <p className="mb-1">Assigned Spool ID: <span className="font-semibold text-slate-100">{currentSpool ? (currentSpool.spool_id || currentSpool.name || `Spool ${currentSpool.id}`) : 'None'}</span></p>
                       <div className="flex gap-2">
+                        <div className="w-full">
+                          <label className="mb-1 block text-sm text-slate-300">Select spool</label>
                         <select
-                          className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs"
+                          className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm"
                           value={slotSpoolSelection[tray.id] ?? ''}
                           onChange={(e) => setSlotSpoolSelection((prev) => ({ ...prev, [tray.id]: e.target.value }))}
                         >
@@ -535,15 +625,16 @@ export default function App() {
                             </option>
                           ))}
                         </select>
+                        </div>
                         <button
                           onClick={() => assignSpoolToTray(tray.id, slotSpoolSelection[tray.id])}
-                          className="rounded bg-emerald-600 px-2 py-1 text-xs font-semibold text-white hover:bg-emerald-500"
+                          className="self-end rounded bg-emerald-600 px-2 py-1 text-sm font-semibold text-white hover:bg-emerald-500"
                         >
                           Load
                         </button>
                         <button
                           onClick={() => unassignSpoolFromTray(tray.id)}
-                          className="rounded bg-slate-600 px-2 py-1 text-xs font-semibold text-white hover:bg-slate-500"
+                          className="self-end rounded bg-slate-600 px-2 py-1 text-sm font-semibold text-white hover:bg-slate-500"
                         >
                           Unload
                         </button>
@@ -588,19 +679,22 @@ export default function App() {
                     </span>
                   </div>
 
-                  <div className="mt-3 flex items-center gap-2">
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.1"
-                      placeholder="Remaining g"
-                      className="w-2/3 rounded-lg border border-slate-700 bg-slate-900 px-2 py-1 text-sm text-slate-100 outline-none focus:border-emerald-300"
-                      value={manualStock[tray.id] ?? ''}
-                      onChange={(e) => setManualStock(prev => ({ ...prev, [tray.id]: e.target.value }))}
-                    />
+                  <div className="mt-3 flex items-end gap-2">
+                    <div className="w-2/3">
+                      <label className="mb-1 block text-sm text-slate-300">Remaining grams</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.1"
+                        placeholder="Remaining g"
+                        className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-base text-slate-100 outline-none focus:border-emerald-300"
+                        value={manualStock[tray.id] ?? ''}
+                        onChange={(e) => setManualStock(prev => ({ ...prev, [tray.id]: e.target.value }))}
+                      />
+                    </div>
                     <button
                       onClick={() => updateStock(tray.id)}
-                      className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-500"
+                      className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500"
                     >
                       Save
                     </button>
