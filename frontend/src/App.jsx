@@ -335,7 +335,7 @@ export default function App() {
           <div>
             <h1 className="sr-only">Panda Prints Dashboard</h1>
             <img
-              src="/assets/pandaprintslogo.svg"
+              src="/assets/pandaprintslogo.png"
               alt="Panda Prints Dashboard"
               className="h-14 w-auto sm:h-16"
             />

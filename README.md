@@ -1,4 +1,4 @@
-![Panda Prints Dashboard](frontend/dist/assets/pandaprintslogo.svg)
+![Panda Prints Dashboard](frontend/dist/assets/pandaprintslogo.png)
 
 A self-hosted filament tracking dashboard for Bambu Lab printers. Tracks AMS tray state live via MQTT, manages a spool inventory, and lets you assign spools to AMS slots to monitor remaining filament.
 
