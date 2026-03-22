@@ -99,6 +99,17 @@ export default function App() {
     remaining_grams: '',
     store_url: ''
   });
+  const [isSpoolIdAuto, setIsSpoolIdAuto] = useState(true);
+
+  const getNextSpoolId = () => {
+    const numericSpoolIds = inventory
+      .map((spool) => String(spool.spool_id ?? '').trim())
+      .filter((id) => /^\d+$/.test(id))
+      .map((id) => Number(id));
+
+    const nextId = (numericSpoolIds.length ? Math.max(...numericSpoolIds) : 0) + 1;
+    return String(nextId).padStart(4, '0');
+  };
 
   const loadInventory = async () => {
     try {
@@ -246,6 +257,15 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!isSpoolIdAuto) return;
+    const suggestedSpoolId = getNextSpoolId();
+    setNewSpool((prev) => {
+      if (prev.spool_id === suggestedSpoolId) return prev;
+      return { ...prev, spool_id: suggestedSpoolId };
+    });
+  }, [inventory, isSpoolIdAuto]);
+
+  useEffect(() => {
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
     const ws = new WebSocket(wsUrl);
@@ -357,7 +377,27 @@ export default function App() {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-5">
             <div>
               <label className="mb-1 block text-sm text-slate-200">Spool ID</label>
-              <input value={newSpool.spool_id} onChange={(e) => setNewSpool((prev) => ({ ...prev, spool_id: e.target.value }))} placeholder="e.g. 0001" className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-base" />
+              <div className="flex gap-2">
+                <input
+                  value={newSpool.spool_id}
+                  onChange={(e) => {
+                    setIsSpoolIdAuto(false);
+                    setNewSpool((prev) => ({ ...prev, spool_id: e.target.value }));
+                  }}
+                  placeholder="e.g. 0001"
+                  className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-base"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSpoolIdAuto(true);
+                    setNewSpool((prev) => ({ ...prev, spool_id: getNextSpoolId() }));
+                  }}
+                  className="rounded border border-slate-600 bg-slate-800 px-3 py-2 text-xs text-slate-200 hover:bg-slate-700"
+                >
+                  Auto
+                </button>
+              </div>
             </div>
             <div>
               <label className="mb-1 block text-sm text-slate-200">Brand</label>
@@ -449,6 +489,7 @@ export default function App() {
                 remaining_grams: '',
                 store_url: ''
               });
+              setIsSpoolIdAuto(true);
             }} className="self-end rounded bg-emerald-500 px-3 py-2 text-sm font-semibold hover:bg-emerald-400">Add spool</button>
           </div>
 
