@@ -333,7 +333,12 @@ export default function App() {
       <div className="mx-auto w-full max-w-[1800px]">
         <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight sm:text-4xl">Panda Prints Dashboard</h1>
+            <h1 className="sr-only">Panda Prints Dashboard</h1>
+            <img
+              src="/assets/pandaprintslogo.svg"
+              alt="Panda Prints Dashboard"
+              className="h-14 w-auto sm:h-16"
+            />
             <p className="text-slate-300 mt-1 text-sm sm:text-base">Live Filament Tracking for your Panda Prints setup</p>
           </div>
           <div className={`inline-flex items-center rounded-full px-4 py-2 text-xs font-semibold sm:text-sm ${connectionStatus.includes('Connected') ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}`}>
