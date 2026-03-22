@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import pandaPrintsLogo from '../pandaprintslogo.png';
 
 export default function App() {
   const [amsTrays, setAmsTrays] = useState([]);
@@ -335,7 +336,7 @@ export default function App() {
           <div>
             <h1 className="sr-only">Panda Prints Dashboard</h1>
             <img
-              src="/assets/pandaprintslogo.png"
+              src={pandaPrintsLogo}
               alt="Panda Prints Dashboard"
               className="h-14 w-auto sm:h-16"
             />
