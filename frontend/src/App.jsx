@@ -601,6 +601,15 @@ export default function App() {
         </section>
 
         <main>
+          <section className="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-100">
+            <h3 className="font-semibold">Spool Swap Workflow</h3>
+            <p className="mt-1 text-amber-100/90">When swapping a physical spool in the AMS:</p>
+            <ol className="mt-2 list-decimal space-y-1 pl-5 text-amber-100/90">
+              <li>Select the new spool in the slot dropdown and press <span className="font-semibold">Load</span>.</li>
+              <li>Physically swap the spool in the AMS.</li>
+            </ol>
+          </section>
+
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {displaySlots.map((tray) => (
               <article key={tray.id} className="rounded-2xl border border-slate-700/70 bg-slate-800/80 p-5 shadow-[0_12px_22px_-10px_rgba(15,23,42,0.75)] backdrop-blur transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_18px_30px_-10px_rgba(15,23,42,0.8)]">
