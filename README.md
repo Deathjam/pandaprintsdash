@@ -2,10 +2,15 @@
 
 A self-hosted filament tracking dashboard for Bambu Lab printers. Tracks AMS tray state live via MQTT, manages a spool inventory, and lets you assign spools to AMS slots to monitor remaining filament.
 
+> Project status: currently functional, but still a work in progress.
+>
+> Current deployment: hosted on a Raspberry Pi, with remote access provided through a Cloudflare Tunnel and secured with Cloudflare Zero Trust.
+
 ## Features
 
 - **Live AMS sync** — tray colour, type, and remaining grams are updated in real time via MQTT from your Bambu printer
 - **Spool inventory** — add, edit, and delete spools with full metadata (brand, material, colour, cost, purchase URL, etc.)
+- **Inventory filters** — narrow the spool table by brand, material, colour, AMS assignment, low stock, or empty spools
 - **Assign spools to AMS trays** — link an inventory spool to a physical tray slot; remaining grams sync automatically
 - **Sync grace period** — after pressing Load, auto-sync is paused briefly so a physical spool swap doesn't overwrite the wrong row
 - **Manual stock override** — update remaining grams for a tray directly from the dashboard at any time
@@ -56,11 +61,110 @@ docker compose up -d --build
 
 Open the dashboard at [http://localhost:3000](http://localhost:3000).
 
+Use the filter controls above the inventory table to quickly narrow the list by brand, material, colour, or stock status.
+
 ### Rebuilding after config changes
 
 ```bash
 docker compose up -d --build
 ```
+
+## Remote Access via Cloudflare
+
+This is the current remote access setup used for the dashboard: the app runs locally on a Raspberry Pi, is exposed publicly through a Cloudflare Tunnel, and is protected by a Cloudflare Zero Trust application with an email-based access policy.
+
+### 1. Install `cloudflared` on the Raspberry Pi
+
+```bash
+curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64.deb -o cloudflared.deb
+sudo dpkg -i cloudflared.deb
+```
+
+If your Pi is running a 32-bit OS, download the matching ARM package from Cloudflare instead of the `arm64` build.
+
+### 2. Authenticate `cloudflared`
+
+```bash
+cloudflared tunnel login
+```
+
+This opens a Cloudflare login flow in your browser. Authorize the tunnel against the zone for your domain.
+
+### 3. Create the tunnel
+
+```bash
+cloudflared tunnel create pandaprintsdash
+```
+
+This creates a named tunnel and stores its credentials locally.
+
+### 4. Configure the tunnel ingress
+
+Create [cloudflared/config.yml](cloudflared/config.yml) on the Pi with your tunnel ID and local service target:
+
+```yaml
+tunnel: YOUR_TUNNEL_ID
+credentials-file: /home/pi/.cloudflared/YOUR_TUNNEL_ID.json
+
+ingress:
+  - hostname: www.domain.com
+    service: http://localhost:3000
+  - service: http_status:404
+```
+
+If your Docker stack is bound differently, replace `http://localhost:3000` with the correct local address.
+
+### 5. Route DNS through the tunnel
+
+Create the DNS route for the `www` hostname:
+
+```bash
+cloudflared tunnel route dns pandaprintsdash www.domain.com
+```
+
+In Cloudflare DNS, the current setup is:
+
+- `AAAA` record for `@` pointing to `100::` with proxy enabled
+- tunnel-backed `www` hostname for the dashboard with proxy enabled
+
+The site is served from `https://www.domain.com`.
+
+### 6. Install and run the tunnel as a service
+
+```bash
+sudo cloudflared service install
+sudo systemctl enable cloudflared
+sudo systemctl start cloudflared
+```
+
+To verify it is running:
+
+```bash
+systemctl status cloudflared
+```
+
+### 7. Redirect the apex domain to `www`
+
+Use a Cloudflare rule so requests for `domain.com` redirect to `https://www.domain.com`.
+
+Current rule logic:
+
+- If hostname equals `domain.com`
+- Then redirect to `concat("https://www.domain.com", http.request.uri.path)`
+- Status code: `301`
+
+### 8. Protect the dashboard with Cloudflare Zero Trust
+
+In Cloudflare Zero Trust, create a self-hosted application for `www.domain.com` and attach an email-based access policy.
+
+Recommended settings:
+
+- Application type: self-hosted
+- Domain: `www.domain.com`
+- Policy action: allow
+- Include rule: approved email addresses or approved email domain
+
+This ensures the dashboard is not publicly reachable without authenticating through Cloudflare Access.
 
 ## Spool Swap Workflow
 
