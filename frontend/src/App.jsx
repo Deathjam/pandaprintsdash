@@ -6,7 +6,14 @@ export default function App() {
   const [connectionStatus, setConnectionStatus] = useState('Connecting...');
   const [manualStock, setManualStock] = useState({});
   const [inventory, setInventory] = useState([]);
-  const [inventoryFilters, setInventoryFilters] = useState({ inAms: false, low: false, empty: false });
+  const [inventoryFilters, setInventoryFilters] = useState({
+    inAms: false,
+    low: false,
+    empty: false,
+    brand: '',
+    material: '',
+    colour: ''
+  });
   const [slotSpoolSelection, setSlotSpoolSelection] = useState({});
 
   const hexToColorName = {
@@ -310,6 +317,9 @@ export default function App() {
   const totalRemaining = displaySlots.reduce((sum, slot) => sum + (typeof slot.gramsRemaining === 'number' ? slot.gramsRemaining : 0), 0);
   const totalUsed = displaySlots.reduce((sum, slot) => sum + (typeof slot.gramsUsed === 'number' && slot.gramsUsed >= 0 ? slot.gramsUsed : 0), 0);
   const totalInventoryCost = inventory.reduce((sum, spool) => sum + (typeof spool.cost === 'number' ? spool.cost : 0), 0);
+  const brandOptions = [...new Set(inventory.map((spool) => spool.brand).filter(Boolean))].sort((left, right) => left.localeCompare(right));
+  const materialOptions = [...new Set(inventory.map((spool) => spool.material).filter(Boolean))].sort((left, right) => left.localeCompare(right));
+  const colourOptions = [...new Set(inventory.map((spool) => spool.color).filter(Boolean))].sort((left, right) => left.localeCompare(right));
 
   const getSpoolFlags = (spool) => {
     const totalNum = spool.total_grams !== null && spool.total_grams !== undefined ? Number(spool.total_grams) : null;
@@ -326,6 +336,9 @@ export default function App() {
     if (inventoryFilters.inAms && !flags.inAms) return false;
     if (inventoryFilters.low && !flags.isLow) return false;
     if (inventoryFilters.empty && !flags.isEmpty) return false;
+    if (inventoryFilters.brand && spool.brand !== inventoryFilters.brand) return false;
+    if (inventoryFilters.material && spool.material !== inventoryFilters.material) return false;
+    if (inventoryFilters.colour && spool.color !== inventoryFilters.colour) return false;
     return true;
   });
 
@@ -502,6 +515,36 @@ export default function App() {
           <div className="overflow-x-auto">
             <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
               <span className="mr-1 text-slate-300">Filter:</span>
+              <select
+                value={inventoryFilters.brand}
+                onChange={(e) => setInventoryFilters((prev) => ({ ...prev, brand: e.target.value }))}
+                className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-slate-200"
+              >
+                <option value="">All Brands</option>
+                {brandOptions.map((brand) => (
+                  <option key={brand} value={brand}>{brand}</option>
+                ))}
+              </select>
+              <select
+                value={inventoryFilters.material}
+                onChange={(e) => setInventoryFilters((prev) => ({ ...prev, material: e.target.value }))}
+                className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-slate-200"
+              >
+                <option value="">All Materials</option>
+                {materialOptions.map((material) => (
+                  <option key={material} value={material}>{material}</option>
+                ))}
+              </select>
+              <select
+                value={inventoryFilters.colour}
+                onChange={(e) => setInventoryFilters((prev) => ({ ...prev, colour: e.target.value }))}
+                className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-slate-200"
+              >
+                <option value="">All Colours</option>
+                {colourOptions.map((colour) => (
+                  <option key={colour} value={colour}>{colour}</option>
+                ))}
+              </select>
               <button
                 type="button"
                 onClick={() => setInventoryFilters((prev) => ({ ...prev, inAms: !prev.inAms }))}
@@ -525,7 +568,7 @@ export default function App() {
               </button>
               <button
                 type="button"
-                onClick={() => setInventoryFilters({ inAms: false, low: false, empty: false })}
+                onClick={() => setInventoryFilters({ inAms: false, low: false, empty: false, brand: '', material: '', colour: '' })}
                 className="rounded border border-slate-600 bg-slate-800 px-2 py-1 text-slate-200 hover:bg-slate-700"
               >
                 Clear Filters
