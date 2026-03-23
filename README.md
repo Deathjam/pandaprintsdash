@@ -42,6 +42,7 @@ PRINTER_ACCESS_CODE=12345678
 PORT=3001
 WS_PORT=8080
 AMS_ASSIGN_SYNC_GRACE_MS=30000
+SPOOL_COST_CURRENCY=GBP
 ```
 
 | Variable | Description |
@@ -52,6 +53,7 @@ AMS_ASSIGN_SYNC_GRACE_MS=30000
 | `PORT` | Backend HTTP port (default: `3001`) |
 | `WS_PORT` | WebSocket port for live updates (default: `8080`) |
 | `AMS_ASSIGN_SYNC_GRACE_MS` | Milliseconds to pause auto-sync after pressing Load, to allow time for a physical spool swap (default: `30000`) |
+| `SPOOL_COST_CURRENCY` | ISO 4217 currency code used when displaying spool costs, for example `GBP`, `USD`, or `EUR` |
 
 ### 2. Start
 

@@ -6,6 +6,7 @@ export default function App() {
   const [connectionStatus, setConnectionStatus] = useState('Connecting...');
   const [manualStock, setManualStock] = useState({});
   const [inventory, setInventory] = useState([]);
+  const [spoolCostCurrency, setSpoolCostCurrency] = useState('GBP');
   const [inventoryFilters, setInventoryFilters] = useState({
     inAms: false,
     low: false,
@@ -127,6 +128,19 @@ export default function App() {
       setInventory(data);
     } catch (e) {
       console.error('loadInventory error', e);
+    }
+  };
+
+  const loadConfig = async () => {
+    try {
+      const res = await fetch('/api/config');
+      if (!res.ok) throw new Error('failed config fetch');
+      const data = await res.json();
+      if (data.spoolCostCurrency) {
+        setSpoolCostCurrency(String(data.spoolCostCurrency).trim().toUpperCase());
+      }
+    } catch (e) {
+      console.error('loadConfig error', e);
     }
   };
 
@@ -260,6 +274,7 @@ export default function App() {
   };
 
   useEffect(() => {
+    loadConfig();
     loadInventory();
     loadAmsState();
   }, []);
@@ -317,6 +332,22 @@ export default function App() {
   const totalRemaining = displaySlots.reduce((sum, slot) => sum + (typeof slot.gramsRemaining === 'number' ? slot.gramsRemaining : 0), 0);
   const totalUsed = displaySlots.reduce((sum, slot) => sum + (typeof slot.gramsUsed === 'number' && slot.gramsUsed >= 0 ? slot.gramsUsed : 0), 0);
   const totalInventoryCost = inventory.reduce((sum, spool) => sum + (typeof spool.cost === 'number' ? spool.cost : 0), 0);
+  const formatCost = (amount) => {
+    const numericAmount = Number(amount);
+    if (Number.isNaN(numericAmount)) return '-';
+
+    try {
+      return new Intl.NumberFormat(undefined, {
+        style: 'currency',
+        currency: spoolCostCurrency,
+        currencyDisplay: 'narrowSymbol',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(numericAmount);
+    } catch (error) {
+      return `${spoolCostCurrency} ${numericAmount.toFixed(2)}`;
+    }
+  };
   const brandOptions = [...new Set(inventory.map((spool) => spool.brand).filter(Boolean))].sort((left, right) => left.localeCompare(right));
   const materialOptions = [...new Set(inventory.map((spool) => spool.material).filter(Boolean))].sort((left, right) => left.localeCompare(right));
   const colourOptions = [...new Set(inventory.map((spool) => spool.color).filter(Boolean))].sort((left, right) => left.localeCompare(right));
@@ -375,7 +406,7 @@ export default function App() {
           </div>
           <div className="rounded-xl border border-slate-700/70 bg-slate-800/70 p-4 text-sm">
             <p className="text-slate-400">Total Inventory Cost</p>
-            <p className="text-lg font-semibold text-blue-300">£{totalInventoryCost.toFixed(2)}</p>
+            <p className="text-lg font-semibold text-blue-300">{formatCost(totalInventoryCost)}</p>
           </div>
         </div>
 
@@ -454,7 +485,7 @@ export default function App() {
               <input value={newSpool.supplier} onChange={(e) => setNewSpool((prev) => ({ ...prev, supplier: e.target.value }))} placeholder="Supplier" className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-base" />
             </div>
             <div>
-              <label className="mb-1 block text-sm text-slate-200">Cost</label>
+              <label className="mb-1 block text-sm text-slate-200">Cost ({spoolCostCurrency})</label>
               <input value={newSpool.cost} onChange={(e) => setNewSpool((prev) => ({ ...prev, cost: e.target.value }))} placeholder="0.00" type="number" min="0" step="0.01" className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-base" />
             </div>
             <div>
@@ -647,7 +678,7 @@ export default function App() {
                     <td className="px-2 py-1">
                       {editingSpoolId === spool.id ? (
                         <input type="number" step="0.01" className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" value={editedSpool.cost ?? ''} onChange={(e) => setEditedSpool((prev) => ({ ...prev, cost: e.target.value }))} />
-                      ) : (spool.cost !== null && spool.cost !== undefined ? `£${Number(spool.cost).toFixed(2)}` : '-')}
+                      ) : (spool.cost !== null && spool.cost !== undefined ? formatCost(spool.cost) : '-')}
                     </td>
                     <td className="px-2 py-1">
                       {editingSpoolId === spool.id ? (

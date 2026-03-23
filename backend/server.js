@@ -9,8 +9,11 @@ const {
   PRINTER_ACCESS_CODE,
   PORT = 3001,
   WS_PORT = 8080,
-  AMS_ASSIGN_SYNC_GRACE_MS = 15000
+  AMS_ASSIGN_SYNC_GRACE_MS = 15000,
+  SPOOL_COST_CURRENCY = 'GBP'
 } = process.env;
+
+const spoolCostCurrency = String(SPOOL_COST_CURRENCY || 'GBP').trim().toUpperCase();
 
 // Initialize SQLite
 const db = new sqlite3.Database('./data/pandaprints.db');
@@ -313,6 +316,10 @@ app.use((req, res, next) => {
     return res.sendStatus(204);
   }
   next();
+});
+
+app.get('/api/config', (req, res) => {
+  res.json({ spoolCostCurrency });
 });
 
 app.post('/api/ams/:trayId/stock', (req, res) => {
