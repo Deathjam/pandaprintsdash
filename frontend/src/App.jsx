@@ -332,6 +332,28 @@ export default function App() {
   const totalRemaining = displaySlots.reduce((sum, slot) => sum + (typeof slot.gramsRemaining === 'number' ? slot.gramsRemaining : 0), 0);
   const totalUsed = displaySlots.reduce((sum, slot) => sum + (typeof slot.gramsUsed === 'number' && slot.gramsUsed >= 0 ? slot.gramsUsed : 0), 0);
   const totalInventoryCost = inventory.reduce((sum, spool) => sum + (typeof spool.cost === 'number' ? spool.cost : 0), 0);
+  const getCurrencySymbol = (currencyCode) => {
+    const normalizedCurrency = String(currencyCode || '').trim().toUpperCase();
+    const aliases = { GDP: 'GBP' };
+    const resolvedCurrency = aliases[normalizedCurrency] || normalizedCurrency || 'GBP';
+
+    try {
+      const parts = new Intl.NumberFormat(undefined, {
+        style: 'currency',
+        currency: resolvedCurrency,
+        currencyDisplay: 'narrowSymbol',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }).formatToParts(1);
+
+      return parts.find((part) => part.type === 'currency')?.value || resolvedCurrency;
+    } catch (error) {
+      return resolvedCurrency;
+    }
+  };
+
+  const displayCurrencyCode = String(spoolCostCurrency || '').trim().toUpperCase() || 'GBP';
+  const displayCurrencySymbol = getCurrencySymbol(displayCurrencyCode);
   const formatCost = (amount) => {
     const numericAmount = Number(amount);
     if (Number.isNaN(numericAmount)) return '-';
@@ -339,13 +361,13 @@ export default function App() {
     try {
       return new Intl.NumberFormat(undefined, {
         style: 'currency',
-        currency: spoolCostCurrency,
+        currency: displayCurrencyCode === 'GDP' ? 'GBP' : displayCurrencyCode,
         currencyDisplay: 'narrowSymbol',
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       }).format(numericAmount);
     } catch (error) {
-      return `${spoolCostCurrency} ${numericAmount.toFixed(2)}`;
+      return `${displayCurrencySymbol}${numericAmount.toFixed(2)}`;
     }
   };
   const brandOptions = [...new Set(inventory.map((spool) => spool.brand).filter(Boolean))].sort((left, right) => left.localeCompare(right));
@@ -384,14 +406,17 @@ export default function App() {
               alt="Panda Prints Dashboard"
               className="h-14 w-auto sm:h-16"
             />
-            <p className="text-slate-300 mt-1 text-sm sm:text-base">Live Filament Tracking for your Panda Prints setup</p>
+            <p className="text-slate-300 mt-1 text-sm sm:text-base">Live Filament Tracking for Bambu Lab 3D Printers
+            </p>
           </div>
           <div className={`inline-flex items-center rounded-full px-4 py-2 text-xs font-semibold sm:text-sm ${connectionStatus.includes('Connected') ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}`}>
             {connectionStatus}
           </div>
         </header>
 
-        <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-4">
+        <section className="mb-8">
+          <h2 className="mb-4 text-xl font-semibold text-slate-100">Overview</h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
           <div className="rounded-xl border border-slate-700/70 bg-slate-800/70 p-4 text-sm">
             <p className="text-slate-400">Total Remaining</p>
             <p className="text-lg font-semibold text-emerald-300">{totalRemaining.toFixed(1)}g</p>
@@ -408,9 +433,13 @@ export default function App() {
             <p className="text-slate-400">Total Inventory Cost</p>
             <p className="text-lg font-semibold text-blue-300">{formatCost(totalInventoryCost)}</p>
           </div>
-        </div>
+          </div>
+        </section>
 
-        <section className="mb-8 rounded-xl border border-slate-700/70 bg-slate-800/70 p-6">
+        <div className="flex flex-col">
+        <section className="order-2 mb-8 rounded-xl border border-slate-700/70 bg-slate-800/70 p-6">
+          <h2 className="mb-4 text-xl font-semibold">Spool Inventory</h2>
+
           <div className="mb-5 rounded-xl border border-slate-700/70 bg-slate-900/50 p-4">
             <h3 className="mb-2 text-base font-semibold text-slate-200">Bambu store fetch</h3>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-5">
@@ -421,8 +450,6 @@ export default function App() {
               <button onClick={fetchSpoolFromUrl} className="sm:col-span-1 w-full self-end rounded bg-blue-500 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-400">Fetch Bambu Info</button>
             </div>
           </div>
-
-          <h2 className="mb-4 text-xl font-semibold">Spool Inventory</h2>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-5">
             <div>
@@ -485,7 +512,7 @@ export default function App() {
               <input value={newSpool.supplier} onChange={(e) => setNewSpool((prev) => ({ ...prev, supplier: e.target.value }))} placeholder="Supplier" className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-base" />
             </div>
             <div>
-              <label className="mb-1 block text-sm text-slate-200">Cost ({spoolCostCurrency})</label>
+              <label className="mb-1 block text-sm text-slate-200">Cost ({displayCurrencySymbol})</label>
               <input value={newSpool.cost} onChange={(e) => setNewSpool((prev) => ({ ...prev, cost: e.target.value }))} placeholder="0.00" type="number" min="0" step="0.01" className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-base" />
             </div>
             <div>
@@ -721,7 +748,8 @@ export default function App() {
           </div>
         </section>
 
-        <main>
+        <main className="order-1 mb-8">
+          <h2 className="mb-4 text-xl font-semibold text-slate-100">AMS Slots</h2>
           <section className="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-100">
             <h3 className="font-semibold">Spool Swap Workflow</h3>
             <p className="mt-1 text-amber-100/90">When swapping a physical spool in the AMS:</p>
@@ -853,10 +881,14 @@ export default function App() {
             ))}
           </div>
 
-          <footer className="mt-6 rounded-xl border border-slate-700/70 bg-slate-900/40 p-4 text-center text-xs text-slate-400">
-            Best experience on mobile or desktop. Pull-to-refresh on mobile when the websocket isn’t live.
-          </footer>
         </main>
+
+        </div>
+
+        <section className="rounded-xl border border-slate-700/70 bg-slate-900/40 p-4 text-center text-xs text-slate-400">
+          <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-300">Usage Notes</h2>
+          <p>Best experience on mobile or desktop. Pull-to-refresh on mobile when the websocket isn’t live.</p>
+        </section>
       </div>
     </div>
   );
