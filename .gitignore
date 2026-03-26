@@ -4,4 +4,3 @@ dist/
 backend/data/*
 !backend/data/.gitkeep
 .DS_Store
-pandaprints-screenshot.png
