@@ -395,6 +395,25 @@ export default function App() {
     return true;
   });
 
+  const sortBySpoolId = (left, right) => {
+    const leftId = String(left.spool_id ?? '').trim();
+    const rightId = String(right.spool_id ?? '').trim();
+    const leftNumeric = /^\d+$/.test(leftId) ? Number(leftId) : null;
+    const rightNumeric = /^\d+$/.test(rightId) ? Number(rightId) : null;
+
+    if (leftNumeric !== null && rightNumeric !== null && leftNumeric !== rightNumeric) {
+      return leftNumeric - rightNumeric;
+    }
+    if (leftNumeric !== null && rightNumeric === null) return -1;
+    if (leftNumeric === null && rightNumeric !== null) return 1;
+    return leftId.localeCompare(rightId, undefined, { numeric: true, sensitivity: 'base' });
+  };
+
+  const sortedFilteredInventory = [...filteredInventory].sort(sortBySpoolId);
+  const amsInventoryRows = sortedFilteredInventory.filter((spool) => getSpoolFlags(spool).inAms);
+  const nonAmsInventoryRows = sortedFilteredInventory.filter((spool) => !getSpoolFlags(spool).inAms);
+  const displayInventoryRows = [...amsInventoryRows, ...nonAmsInventoryRows];
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 px-5 py-8 text-[15px] text-white sm:px-8 sm:py-10 sm:text-base">
       <div className="mx-auto w-full max-w-[1800px]">
@@ -651,8 +670,9 @@ export default function App() {
                 </tr>
               </thead>
               <tbody>
-                {filteredInventory.map((spool) => {
+                {displayInventoryRows.map((spool, index) => {
                   const { inAms, isLow, isEmpty } = getSpoolFlags(spool);
+                  const showAmsDivider = index === amsInventoryRows.length && amsInventoryRows.length > 0 && nonAmsInventoryRows.length > 0;
 
                   let rowHighlight = '';
                   if (isEmpty) rowHighlight = 'bg-rose-900/30';
@@ -660,7 +680,15 @@ export default function App() {
                   else if (inAms) rowHighlight = 'bg-emerald-900/20';
 
                   return (
-                  <tr key={spool.id} className={`border-t border-slate-700 ${rowHighlight}`}>
+                  <React.Fragment key={spool.id}>
+                    {showAmsDivider && (
+                      <tr className="border-t-2 border-slate-500/80 bg-slate-900/70">
+                        <td colSpan="13" className="px-2 py-2 text-center text-xs font-semibold uppercase tracking-wide text-slate-300">
+                          Non-AMS Inventory
+                        </td>
+                      </tr>
+                    )}
+                  <tr className={`border-t border-slate-700 ${rowHighlight}`}>
                     <td className="px-2 py-1">
                       {editingSpoolId === spool.id ? (
                         <input className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" value={editedSpool.spool_id ?? ''} onChange={(e) => setEditedSpool((prev) => ({ ...prev, spool_id: e.target.value }))} />
@@ -737,6 +765,7 @@ export default function App() {
                       )}
                     </td>
                   </tr>
+                  </React.Fragment>
                 );})}
                 {filteredInventory.length === 0 && (
                   <tr>
