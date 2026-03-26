@@ -6,6 +6,10 @@ A self-hosted filament tracking dashboard for Bambu Lab printers. Tracks AMS tra
 >
 > Current deployment: hosted on a Raspberry Pi, with remote access provided through a Cloudflare Tunnel and secured with Cloudflare Zero Trust.
 
+## Dashboard Preview
+
+![Panda Prints Dashboard Screenshot](pandaprints-screenshot.png)
+
 ## Features
 
 - **Live AMS sync** — tray colour, type, and remaining grams are updated in real time via MQTT from your Bambu printer
