@@ -793,7 +793,9 @@ export default function App() {
               <article key={tray.id} className="rounded-2xl border border-slate-700/70 bg-slate-800/80 p-5 shadow-[0_12px_22px_-10px_rgba(15,23,42,0.75)] backdrop-blur transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_18px_30px_-10px_rgba(15,23,42,0.8)]">
                 {(() => {
                   const currentSpool = inventory.find((spool) => spool.tray_id === tray.id);
-                  const selectableSpools = inventory.filter((spool) => spool.tray_id === null || spool.tray_id === undefined || spool.tray_id === tray.id);
+                  const selectableSpools = inventory
+                    .filter((spool) => spool.tray_id === null || spool.tray_id === undefined || spool.tray_id === tray.id)
+                    .sort(sortBySpoolId);
                   return (
                     <div className="mb-3 rounded-lg bg-slate-900/50 p-2 text-xs text-slate-300">
                       <p className="mb-1">Assigned Spool ID: <span className="font-semibold text-slate-100">{currentSpool ? (currentSpool.spool_id || currentSpool.name || `Spool ${currentSpool.id}`) : 'None'}</span></p>
