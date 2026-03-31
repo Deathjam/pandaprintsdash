@@ -391,6 +391,15 @@ app.get('/api/ams_state', (req, res) => {
   });
 });
 
+app.post('/api/ams/refresh', (req, res) => {
+  if (!mqttClient || !mqttClient.connected) {
+    return res.status(503).json({ error: 'MQTT not connected' });
+  }
+  const pushAllPayload = { pushing: { sequence_id: "1", command: "pushall" } };
+  mqttClient.publish(`device/${PRINTER_SERIAL}/request`, JSON.stringify(pushAllPayload));
+  res.json({ ok: true });
+});
+
 app.post('/api/ams/:trayId/assign-spool', (req, res) => {
   const trayId = parseInt(req.params.trayId, 10);
   const spoolId = parseInt(req.body?.spoolId, 10);
