@@ -17,6 +17,7 @@ A self-hosted filament tracking dashboard for Bambu Lab printers. Tracks AMS tra
 - **Inventory filters** — narrow the spool table by brand, material, colour, AMS assignment, low stock, or empty spools
 - **Assign spools to AMS trays** — link an inventory spool to a physical tray slot; remaining grams sync automatically
 - **Sync grace period** — after pressing Load, auto-sync is paused briefly so a physical spool swap doesn't overwrite the wrong row
+- **Refresh AMS** — force the printer to re-report all AMS tray state on demand via an MQTT `pushall` command
 - **Manual stock override** — update remaining grams for a tray directly from the dashboard at any time
 - **Auto-populate from URL** — paste a Bambu Lab product URL and the dashboard pre-fills spool metadata automatically
 - **WebSocket live updates** — all connected browser tabs update instantly without polling
@@ -201,12 +202,13 @@ Pressing Load first triggers the sync grace period, preventing the printer's nex
 | `POST` | `/api/ams/:trayId/assign-spool` | Assign an inventory spool to a tray |
 | `POST` | `/api/ams/:trayId/unassign-spool` | Unassign the spool from a tray |
 | `POST` | `/api/ams/:trayId/stock` | Manually update remaining grams for a tray |
+| `POST` | `/api/ams/refresh` | Force the printer to resend all AMS tray state via MQTT |
 
 #### POST /api/spools — example body
 
 ```json
 {
-  "spool_id": "BL-PLA-001",
+  "spool_id": "0001",
   "name": "True Silk PLA",
   "brand": "Bambu Lab",
   "material": "PLA",
