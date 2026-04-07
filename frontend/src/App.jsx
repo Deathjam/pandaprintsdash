@@ -782,8 +782,8 @@ export default function App() {
                         </div>
                       ) : (
                         <div className="flex gap-1">
-                          <button onClick={() => { setEditingSpoolId(spool.id); setEditedSpool(spool); }} className="rounded bg-blue-500 px-2 py-1 text-xs">Edit</button>
-                          <button onClick={() => deleteSpool(spool.id)} className="rounded bg-rose-500 px-2 py-1 text-xs">Remove</button>
+                          <button onClick={() => { setEditingSpoolId(spool.id); setEditedSpool(spool); }} className="rounded bg-blue-500 px-3 py-2 text-sm font-medium">Edit</button>
+                          <button onClick={() => deleteSpool(spool.id)} className="rounded bg-rose-500 px-3 py-2 text-sm font-medium">Remove</button>
                         </div>
                       )}
                     </td>
