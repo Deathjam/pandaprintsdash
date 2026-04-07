@@ -411,7 +411,7 @@ export default function App() {
   };
 
   const sortedFilteredInventory = [...filteredInventory].sort(sortBySpoolId);
-  const amsInventoryRows = sortedFilteredInventory.filter((spool) => getSpoolFlags(spool).inAms);
+  const amsInventoryRows = sortedFilteredInventory.filter((spool) => getSpoolFlags(spool).inAms).sort((a, b) => (a.tray_id ?? 0) - (b.tray_id ?? 0));
   const nonAmsInventoryRows = sortedFilteredInventory.filter((spool) => !getSpoolFlags(spool).inAms);
   const displayInventoryRows = [...amsInventoryRows, ...nonAmsInventoryRows];
 
