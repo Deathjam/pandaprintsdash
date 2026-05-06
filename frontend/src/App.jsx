@@ -71,6 +71,18 @@ export default function App() {
     return normalized ? (hexToColorName[normalized] || null) : null;
   };
 
+  const getHexFromColorName = (name) => {
+    if (!name || typeof name !== 'string') return null;
+    const target = name.trim().toLowerCase();
+    if (!target) return null;
+
+    const matchedHex = Object.entries(hexToColorName).find(([, colorName]) =>
+      String(colorName).trim().toLowerCase() === target
+    )?.[0];
+
+    return matchedHex || null;
+  };
+
   const [editingSpoolId, setEditingSpoolId] = useState(null);
   const [editedSpool, setEditedSpool] = useState(null);
 
@@ -817,6 +829,9 @@ export default function App() {
               const selectableSpools = inventory
                 .filter((spool) => spool.tray_id === null || spool.tray_id === undefined || spool.tray_id === tray.id)
                 .sort(sortBySpoolId);
+              const spoolHex = normalizeHex(currentSpool?.color || '');
+              const spoolNamedHex = getHexFromColorName(currentSpool?.color || '');
+              const slotDisplayColor = spoolHex || spoolNamedHex || tray.color;
               const slotColorLabel = currentSpool?.color
                 ? (getColorNameFromHex(currentSpool.color) || currentSpool.color)
                 : (getColorNameFromHex(tray.color) || tray.color || 'Unknown');
@@ -859,7 +874,7 @@ export default function App() {
                 <div className="mb-5 flex flex-col items-center justify-center gap-2">
                   <div
                     className="relative flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border-8 border-slate-600 shadow-inner transition-all duration-500"
-                    style={{ backgroundColor: tray.color }}
+                    style={{ backgroundColor: slotDisplayColor }}
                     aria-label={`Color preview for slot ${tray.id + 1}`}>
                     <div className="absolute inset-0 bg-black/20" />
                     <div className="relative z-10 h-12 w-12 rounded-full border-4 border-slate-700 bg-slate-900" />
