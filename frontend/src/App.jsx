@@ -812,48 +812,49 @@ export default function App() {
           </section>
 
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {displaySlots.map((tray) => (
+            {displaySlots.map((tray) => {
+              const currentSpool = inventory.find((spool) => spool.tray_id === tray.id);
+              const selectableSpools = inventory
+                .filter((spool) => spool.tray_id === null || spool.tray_id === undefined || spool.tray_id === tray.id)
+                .sort(sortBySpoolId);
+              const slotColorLabel = currentSpool?.color
+                ? (getColorNameFromHex(currentSpool.color) || currentSpool.color)
+                : (getColorNameFromHex(tray.color) || tray.color || 'Unknown');
+
+              return (
               <article key={tray.id} className="rounded-2xl border border-slate-700/70 bg-slate-800/80 p-5 shadow-[0_12px_22px_-10px_rgba(15,23,42,0.75)] backdrop-blur transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_18px_30px_-10px_rgba(15,23,42,0.8)]">
-                {(() => {
-                  const currentSpool = inventory.find((spool) => spool.tray_id === tray.id);
-                  const selectableSpools = inventory
-                    .filter((spool) => spool.tray_id === null || spool.tray_id === undefined || spool.tray_id === tray.id)
-                    .sort(sortBySpoolId);
-                  return (
-                    <div className="mb-3 rounded-lg bg-slate-900/50 p-2 text-xs text-slate-300">
-                      <p className="mb-1">Assigned Spool ID: <span className="font-semibold text-slate-100">{currentSpool ? (currentSpool.spool_id || currentSpool.name || `Spool ${currentSpool.id}`) : 'None'}</span></p>
-                      <div className="flex gap-2">
-                        <div className="w-full">
-                          <label className="mb-1 block text-sm text-slate-300">Select spool</label>
-                        <select
-                          className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm"
-                          value={slotSpoolSelection[tray.id] ?? ''}
-                          onChange={(e) => setSlotSpoolSelection((prev) => ({ ...prev, [tray.id]: e.target.value }))}
-                        >
-                          <option value="">Select Spool ID</option>
-                          {selectableSpools.map((spool) => (
-                            <option key={spool.id} value={spool.id}>
-                              {(spool.spool_id || `Spool ${spool.id}`)} - {(spool.material || 'Unknown Material')} - {(spool.color || 'Unknown Colour')}
-                            </option>
-                          ))}
-                        </select>
-                        </div>
-                        <button
-                          onClick={() => assignSpoolToTray(tray.id, slotSpoolSelection[tray.id])}
-                          className="self-end rounded bg-emerald-600 px-2 py-1 text-sm font-semibold text-white hover:bg-emerald-500"
-                        >
-                          Load
-                        </button>
-                        <button
-                          onClick={() => unassignSpoolFromTray(tray.id)}
-                          className="self-end rounded bg-slate-600 px-2 py-1 text-sm font-semibold text-white hover:bg-slate-500"
-                        >
-                          Unload
-                        </button>
-                      </div>
+                <div className="mb-3 rounded-lg bg-slate-900/50 p-2 text-xs text-slate-300">
+                  <p className="mb-1">Assigned Spool ID: <span className="font-semibold text-slate-100">{currentSpool ? (currentSpool.spool_id || currentSpool.name || `Spool ${currentSpool.id}`) : 'None'}</span></p>
+                  <div className="flex gap-2">
+                    <div className="w-full">
+                      <label className="mb-1 block text-sm text-slate-300">Select spool</label>
+                    <select
+                      className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm"
+                      value={slotSpoolSelection[tray.id] ?? ''}
+                      onChange={(e) => setSlotSpoolSelection((prev) => ({ ...prev, [tray.id]: e.target.value }))}
+                    >
+                      <option value="">Select Spool ID</option>
+                      {selectableSpools.map((spool) => (
+                        <option key={spool.id} value={spool.id}>
+                          {(spool.spool_id || `Spool ${spool.id}`)} - {(spool.material || 'Unknown Material')} - {(spool.color || 'Unknown Colour')}
+                        </option>
+                      ))}
+                    </select>
                     </div>
-                  );
-                })()}
+                    <button
+                      onClick={() => assignSpoolToTray(tray.id, slotSpoolSelection[tray.id])}
+                      className="self-end rounded bg-emerald-600 px-2 py-1 text-sm font-semibold text-white hover:bg-emerald-500"
+                    >
+                      Load
+                    </button>
+                    <button
+                      onClick={() => unassignSpoolFromTray(tray.id)}
+                      className="self-end rounded bg-slate-600 px-2 py-1 text-sm font-semibold text-white hover:bg-slate-500"
+                    >
+                      Unload
+                    </button>
+                  </div>
+                </div>
                 <h2 className="mb-3 text-lg font-semibold text-slate-100">Slot {tray.id + 1}</h2>
                 <div className="mb-5 flex flex-col items-center justify-center gap-2">
                   <div
@@ -864,7 +865,7 @@ export default function App() {
                     <div className="relative z-10 h-12 w-12 rounded-full border-4 border-slate-700 bg-slate-900" />
                   </div>
                   <span className="text-xs text-slate-300">
-                    {getColorNameFromHex(tray.color) || tray.color || 'Unknown'}
+                    {slotColorLabel}
                     {!tray.rfidDetected && tray.type !== 'Empty' ? ' (No RFID)' : ''}
                   </span>
                 </div>
@@ -932,7 +933,7 @@ export default function App() {
                   </button>
                 </div>
               </article>
-            ))}
+            );})}
           </div>
 
         </main>
