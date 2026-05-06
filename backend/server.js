@@ -48,6 +48,29 @@ db.serialize(() => {
     }
   });
 
+  db.run(`CREATE TABLE IF NOT EXISTS colours (
+    hex TEXT PRIMARY KEY,
+    name TEXT NOT NULL
+  )`);
+
+  const seedColours = [
+    ['#FFFFFF', 'Jade White'], ['#EC008C', 'Magenta'], ['#E4BD68', 'Gold'],
+    ['#3F8E43', 'Mistletoe Green'], ['#C12E1F', 'Red'], ['#F7E6DE', 'Beige'],
+    ['#F55A74', 'Pink'], ['#FEC600', 'Sunflower Yellow'], ['#847D48', 'Bronze'],
+    ['#D1D3D5', 'Light Gray'], ['#F5547C', 'Hot Pink'], ['#F4EE2A', 'Yellow'],
+    ['#A6A9AA', 'Silver'], ['#FF6A13', 'Orange'], ['#8E9089', 'Gray'],
+    ['#FF9016', 'Pumpkin Orange'], ['#BECF00', 'Bright Green'], ['#6F5034', 'Cocoa Brown'],
+    ['#00B1B7', 'Turquoise'], ['#5E43B7', 'Purple'], ['#482960', 'Indigo Purple'],
+    ['#0086D6', 'Cyan'], ['#5B6579', 'Blue Grey'], ['#9D432C', 'Brown'],
+    ['#0A2989', 'Blue'], ['#545454', 'Dark Gray'], ['#00AE42', 'Bambu Green'],
+    ['#9D2235', 'Maroon Red'], ['#0056B8', 'Cobalt Blue'], ['#000000', 'Black']
+  ];
+  const insertColour = db.prepare('INSERT OR IGNORE INTO colours (hex, name) VALUES (?, ?)');
+  for (const [hex, name] of seedColours) {
+    insertColour.run(hex, name);
+  }
+  insertColour.finalize();
+
   db.run(`CREATE TABLE IF NOT EXISTS spool_inventory (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     spool_id TEXT,
@@ -823,6 +846,53 @@ app.delete('/api/spools/:id', (req, res) => {
   db.run('DELETE FROM spool_inventory WHERE id = ?', [id], function (err) {
     if (err) return res.status(500).json({ error: 'database error' });
     if (this.changes === 0) return res.status(404).json({ error: 'not found' });
+    res.json({ deleted: true });
+  });
+});
+
+app.get('/api/colours', (req, res) => {
+  db.all('SELECT hex, name FROM colours ORDER BY name ASC', [], (err, rows) => {
+    if (err) return res.status(500).json({ error: 'database error' });
+    res.json(rows);
+  });
+});
+
+app.post('/api/colours', (req, res) => {
+  const { hex, name } = req.body;
+  if (!hex || !name || typeof hex !== 'string' || typeof name !== 'string') {
+    return res.status(400).json({ error: 'hex and name are required strings' });
+  }
+  const normalizedHex = hex.trim().toUpperCase();
+  if (!/^#[0-9A-F]{6}$/.test(normalizedHex)) {
+    return res.status(400).json({ error: 'hex must be a 6-digit colour code e.g. #FFFFFF' });
+  }
+  db.run('INSERT INTO colours (hex, name) VALUES (?, ?)', [normalizedHex, name.trim()], function (err) {
+    if (err) {
+      if (err.message.includes('UNIQUE')) return res.status(409).json({ error: 'colour already exists' });
+      return res.status(500).json({ error: 'database error' });
+    }
+    res.status(201).json({ hex: normalizedHex, name: name.trim() });
+  });
+});
+
+app.put('/api/colours/:hex', (req, res) => {
+  const hex = decodeURIComponent(req.params.hex).trim().toUpperCase();
+  const { name } = req.body;
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return res.status(400).json({ error: 'name is required' });
+  }
+  db.run('UPDATE colours SET name = ? WHERE hex = ?', [name.trim(), hex], function (err) {
+    if (err) return res.status(500).json({ error: 'database error' });
+    if (this.changes === 0) return res.status(404).json({ error: 'colour not found' });
+    res.json({ hex, name: name.trim() });
+  });
+});
+
+app.delete('/api/colours/:hex', (req, res) => {
+  const hex = decodeURIComponent(req.params.hex).trim().toUpperCase();
+  db.run('DELETE FROM colours WHERE hex = ?', [hex], function (err) {
+    if (err) return res.status(500).json({ error: 'database error' });
+    if (this.changes === 0) return res.status(404).json({ error: 'colour not found' });
     res.json({ deleted: true });
   });
 });
