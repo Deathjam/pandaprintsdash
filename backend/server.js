@@ -48,28 +48,97 @@ db.serialize(() => {
     }
   });
 
-  db.run(`CREATE TABLE IF NOT EXISTS colours (
-    hex TEXT PRIMARY KEY,
-    name TEXT NOT NULL
-  )`);
-
   const seedColours = [
     ['#FFFFFF', 'Jade White'], ['#EC008C', 'Magenta'], ['#E4BD68', 'Gold'],
     ['#3F8E43', 'Mistletoe Green'], ['#C12E1F', 'Red'], ['#F7E6DE', 'Beige'],
     ['#F55A74', 'Pink'], ['#FEC600', 'Sunflower Yellow'], ['#847D48', 'Bronze'],
     ['#D1D3D5', 'Light Gray'], ['#F5547C', 'Hot Pink'], ['#F4EE2A', 'Yellow'],
     ['#A6A9AA', 'Silver'], ['#FF6A13', 'Orange'], ['#8E9089', 'Gray'],
-    ['#FF9016', 'Pumpkin Orange'], ['#BECF00', 'Bright Green'], ['#6F5034', 'Cocoa Brown'],
+    ['#FF9016', 'Pumpkin Orange'], ['#BECF00', 'Bright Green'], ['#6F5034', 'Coffee Brown'],
     ['#00B1B7', 'Turquoise'], ['#5E43B7', 'Purple'], ['#482960', 'Indigo Purple'],
     ['#0086D6', 'Cyan'], ['#5B6579', 'Blue Grey'], ['#9D432C', 'Brown'],
     ['#0A2989', 'Blue'], ['#545454', 'Dark Gray'], ['#00AE42', 'Bambu Green'],
-    ['#9D2235', 'Maroon Red'], ['#0056B8', 'Cobalt Blue'], ['#000000', 'Black']
+    ['#9D2235', 'Maroon Red'], ['#0056B8', 'Cobalt Blue'], ['#000000', 'Black'], ['#000000', 'ABS Black']
   ];
-  const insertColour = db.prepare('INSERT OR IGNORE INTO colours (hex, name) VALUES (?, ?)');
-  for (const [hex, name] of seedColours) {
-    insertColour.run(hex, name);
-  }
-  insertColour.finalize();
+
+  const seedColoursTable = () => {
+    const insertColour = db.prepare('INSERT OR IGNORE INTO colours (hex, name) VALUES (?, ?)');
+    for (const [hex, name] of seedColours) {
+      insertColour.run(hex, name);
+    }
+    insertColour.finalize();
+  };
+
+  const ensureColoursSchema = () => {
+    db.run(`CREATE TABLE IF NOT EXISTS colours (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      hex TEXT NOT NULL,
+      name TEXT NOT NULL,
+      UNIQUE(hex, name)
+    )`, (createErr) => {
+      if (createErr) {
+        console.error('failed to create colours table:', createErr);
+        return;
+      }
+
+      db.all('PRAGMA table_info(colours)', [], (infoErr, infoRows) => {
+        if (infoErr) {
+          console.error('failed to inspect colours schema:', infoErr);
+          return;
+        }
+
+        const hasIdPrimaryKey = infoRows.some((r) => r.name === 'id' && Number(r.pk) === 1);
+        const hasHexPrimaryKey = infoRows.some((r) => r.name === 'hex' && Number(r.pk) === 1);
+
+        if (hasHexPrimaryKey && !hasIdPrimaryKey) {
+          db.run('ALTER TABLE colours RENAME TO colours_legacy', (renameErr) => {
+            if (renameErr) {
+              console.error('failed to rename legacy colours table:', renameErr);
+              return;
+            }
+
+            db.run(`CREATE TABLE colours (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              hex TEXT NOT NULL,
+              name TEXT NOT NULL,
+              UNIQUE(hex, name)
+            )`, (newTableErr) => {
+              if (newTableErr) {
+                console.error('failed to create migrated colours table:', newTableErr);
+                return;
+              }
+
+              db.run('INSERT OR IGNORE INTO colours (hex, name) SELECT hex, name FROM colours_legacy', (copyErr) => {
+                if (copyErr) {
+                  console.error('failed to copy legacy colours data:', copyErr);
+                  return;
+                }
+
+                db.run('DROP TABLE colours_legacy', (dropErr) => {
+                  if (dropErr) {
+                    console.error('failed to drop legacy colours table:', dropErr);
+                    return;
+                  }
+                  seedColoursTable();
+                });
+              });
+            });
+          });
+          return;
+        }
+
+        db.run('CREATE UNIQUE INDEX IF NOT EXISTS idx_colours_hex_name ON colours(hex, name)', (indexErr) => {
+          if (indexErr) {
+            console.error('failed to ensure colours unique index:', indexErr);
+            return;
+          }
+          seedColoursTable();
+        });
+      });
+    });
+  };
+
+  ensureColoursSchema();
 
   db.run(`CREATE TABLE IF NOT EXISTS spool_inventory (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

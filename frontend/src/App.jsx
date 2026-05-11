@@ -18,6 +18,7 @@ export default function App() {
   const [slotSpoolSelection, setSlotSpoolSelection] = useState({});
   const [refreshingAms, setRefreshingAms] = useState(false);
   const [hexToColorName, setHexToColorName] = useState({});
+  const [colorNameToHex, setColorNameToHex] = useState({});
 
   const normalizeHex = (hex) => {
     if (!hex || typeof hex !== 'string') return null;
@@ -44,11 +45,7 @@ export default function App() {
     const target = name.trim().toLowerCase();
     if (!target) return null;
 
-    const matchedHex = Object.entries(hexToColorName).find(([, colorName]) =>
-      String(colorName).trim().toLowerCase() === target
-    )?.[0];
-
-    return matchedHex || null;
+    return colorNameToHex[target] || null;
   };
 
   const [editingSpoolId, setEditingSpoolId] = useState(null);
@@ -106,9 +103,21 @@ export default function App() {
       const res = await fetch('/api/colours');
       if (!res.ok) throw new Error('failed colours fetch');
       const rows = await res.json();
-      const map = {};
-      for (const { hex, name } of rows) map[hex] = name;
-      setHexToColorName(map);
+      const hexMap = {};
+      const nameMap = {};
+      for (const { hex, name } of rows) {
+        const normalizedHex = normalizeHex(hex);
+        const trimmedName = typeof name === 'string' ? name.trim() : '';
+        if (!normalizedHex || !trimmedName) continue;
+
+        if (!hexMap[normalizedHex]) {
+          // Keep first alphabetical entry as the display label for this hex.
+          hexMap[normalizedHex] = trimmedName;
+        }
+        nameMap[trimmedName.toLowerCase()] = normalizedHex;
+      }
+      setHexToColorName(hexMap);
+      setColorNameToHex(nameMap);
     } catch (e) {
       console.error('loadColours error', e);
     }
