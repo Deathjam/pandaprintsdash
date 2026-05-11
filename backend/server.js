@@ -49,16 +49,37 @@ db.serialize(() => {
   });
 
   const seedColours = [
-    ['#FFFFFF', 'Jade White'], ['#EC008C', 'Magenta'], ['#E4BD68', 'Gold'],
-    ['#3F8E43', 'Mistletoe Green'], ['#C12E1F', 'Red'], ['#F7E6DE', 'Beige'],
-    ['#F55A74', 'Pink'], ['#FEC600', 'Sunflower Yellow'], ['#847D48', 'Bronze'],
-    ['#D1D3D5', 'Light Gray'], ['#F5547C', 'Hot Pink'], ['#F4EE2A', 'Yellow'],
-    ['#A6A9AA', 'Silver'], ['#FF6A13', 'Orange'], ['#8E9089', 'Gray'],
-    ['#FF9016', 'Pumpkin Orange'], ['#BECF00', 'Bright Green'], ['#6F5034', 'Coffee Brown'],
-    ['#00B1B7', 'Turquoise'], ['#5E43B7', 'Purple'], ['#482960', 'Indigo Purple'],
-    ['#0086D6', 'Cyan'], ['#5B6579', 'Blue Grey'], ['#9D432C', 'Brown'],
-    ['#0A2989', 'Blue'], ['#545454', 'Dark Gray'], ['#00AE42', 'Bambu Green'],
-    ['#9D2235', 'Maroon Red'], ['#0056B8', 'Cobalt Blue'], ['#000000', 'Black'], ['#000000', 'ABS Black']
+    ['#FFFFFF', 'Jade White'],
+    ['#EC008C', 'Magenta'],
+    ['#E4BD68', 'Gold'],
+    ['#3F8E43', 'Mistletoe Green'],
+    ['#C12E1F', 'Red'],
+    ['#F7E6DE', 'Beige'],
+    ['#F55A74', 'Pink'],
+    ['#FEC600', 'Sunflower Yellow'],
+    ['#847D48', 'Bronze'],
+    ['#D1D3D5', 'Light Gray'],
+    ['#F5547C', 'Hot Pink'],
+    ['#F4EE2A', 'Yellow'],
+    ['#A6A9AA', 'Silver'],
+    ['#FF6A13', 'Orange'],
+    ['#8E9089', 'Gray'],
+    ['#FF9016', 'Pumpkin Orange'],
+    ['#BECF00', 'Bright Green'],
+    ['#6F5034', 'Coffee Brown'],
+    ['#00B1B7', 'Turquoise'],
+    ['#5E43B7', 'Purple'],
+    ['#482960', 'Indigo Purple'],
+    ['#0086D6', 'Cyan'],
+    ['#5B6579', 'Blue Grey'],
+    ['#9D432C', 'Brown'],
+    ['#0A2989', 'Blue'],
+    ['#545454', 'Dark Gray'],
+    ['#00AE42', 'Bambu Green'],
+    ['#9D2235', 'Maroon Red'],
+    ['#0056B8', 'Cobalt Blue'],
+    ['#000000', 'Black'],
+    ['#000000', 'ABS Black']
   ];
 
   const seedColoursTable = () => {
