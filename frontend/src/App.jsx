@@ -2,6 +2,11 @@ import React, { useState, useEffect } from 'react';
 import pandaPrintsLogo from '../pandaprintslogo.png';
 
 export default function App() {
+  const API_ORIGIN = 'https://www.mindview.co.uk';
+  const apiUrl = (path) => `${API_ORIGIN}${path}`;
+  const apiFetch = (path, options) => fetch(apiUrl(path), options);
+  const wsUrl = 'wss://www.mindview.co.uk/ws';
+
   const [amsTrays, setAmsTrays] = useState([]);
   const [connectionStatus, setConnectionStatus] = useState('Connecting...');
   const [manualStock, setManualStock] = useState({});
@@ -19,6 +24,12 @@ export default function App() {
   const [refreshingAms, setRefreshingAms] = useState(false);
   const [hexToColorName, setHexToColorName] = useState({});
   const [colorNameToHex, setColorNameToHex] = useState({});
+  const [printerStatus, setPrinterStatus] = useState({
+    state: 'Unknown',
+    isPrinting: false,
+    timeRemainingMinutes: null,
+    mqttConnected: false,
+  });
   const [activeTab, setActiveTab] = useState('dashboard');
 
   // Library state
@@ -66,7 +77,7 @@ export default function App() {
 
   const updateSpool = async (id, payload) => {
     try {
-      const res = await fetch(`/api/spools/${id}`, {
+      const res = await apiFetch(`/api/spools/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -113,7 +124,7 @@ export default function App() {
 
   const loadColours = async () => {
     try {
-      const res = await fetch('/api/colours');
+      const res = await apiFetch('/api/colours');
       if (!res.ok) throw new Error('failed colours fetch');
       const rows = await res.json();
       setLibraryColours(rows);
@@ -139,7 +150,7 @@ export default function App() {
 
   const loadMaterials = async () => {
     try {
-      const res = await fetch('/api/materials');
+      const res = await apiFetch('/api/materials');
       if (!res.ok) throw new Error('failed materials fetch');
       setLibraryMaterials(await res.json());
     } catch (e) {
@@ -149,7 +160,7 @@ export default function App() {
 
   const loadInventory = async () => {
     try {
-      const res = await fetch('/api/spools');
+      const res = await apiFetch('/api/spools');
       if (!res.ok) throw new Error('failed inventory fetch');
       const data = await res.json();
       setInventory(data);
@@ -160,7 +171,7 @@ export default function App() {
 
   const loadConfig = async () => {
     try {
-      const res = await fetch('/api/config');
+      const res = await apiFetch('/api/config');
       if (!res.ok) throw new Error('failed config fetch');
       const data = await res.json();
       if (data.spoolCostCurrency) {
@@ -171,9 +182,27 @@ export default function App() {
     }
   };
 
+  const loadPrinterStatus = async () => {
+    try {
+      const res = await apiFetch('/api/printer-status');
+      if (!res.ok) throw new Error('failed printer status fetch');
+      const data = await res.json();
+      setPrinterStatus({
+        state: data.state || 'Unknown',
+        isPrinting: Boolean(data.isPrinting),
+        timeRemainingMinutes: Number.isFinite(Number(data.timeRemainingMinutes))
+          ? Number(data.timeRemainingMinutes)
+          : null,
+        mqttConnected: Boolean(data.mqttConnected),
+      });
+    } catch (e) {
+      console.error('loadPrinterStatus error', e);
+    }
+  };
+
   const addSpool = async (payload) => {
     try {
-      const res = await fetch('/api/spools', {
+      const res = await apiFetch('/api/spools', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -190,7 +219,7 @@ export default function App() {
 
   const deleteSpool = async (id) => {
     try {
-      const res = await fetch(`/api/spools/${id}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/spools/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('delete failed');
       setInventory((prev) => prev.filter((item) => item.id !== id));
     } catch (e) {
@@ -201,7 +230,7 @@ export default function App() {
   const fetchSpoolFromUrl = async () => {
     if (!newSpool.store_url) return;
     try {
-      const res = await fetch('/api/spools/fetch-url', {
+      const res = await apiFetch('/api/spools/fetch-url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: newSpool.store_url })
@@ -235,7 +264,7 @@ export default function App() {
     }
 
     try {
-      const res = await fetch(`/api/ams/${trayId}/stock`, {
+      const res = await apiFetch(`/api/ams/${trayId}/stock`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -250,7 +279,7 @@ export default function App() {
   const assignSpoolToTray = async (trayId, spoolId) => {
     if (!spoolId) return;
     try {
-      const res = await fetch(`/api/ams/${trayId}/assign-spool`, {
+      const res = await apiFetch(`/api/ams/${trayId}/assign-spool`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ spoolId: Number(spoolId) }),
@@ -264,7 +293,7 @@ export default function App() {
 
   const unassignSpoolFromTray = async (trayId) => {
     try {
-      const res = await fetch(`/api/ams/${trayId}/unassign-spool`, {
+      const res = await apiFetch(`/api/ams/${trayId}/unassign-spool`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
@@ -277,7 +306,7 @@ export default function App() {
 
   const loadAmsState = async () => {
     try {
-      const res = await fetch('/api/ams_state');
+      const res = await apiFetch('/api/ams_state');
       if (!res.ok) throw new Error('failed AMS state fetch');
       const rows = await res.json();
       const mappedData = rows.map((tray) => {
@@ -306,6 +335,15 @@ export default function App() {
     loadMaterials();
     loadInventory();
     loadAmsState();
+    loadPrinterStatus();
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadPrinterStatus();
+    }, 10000);
+
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -318,8 +356,6 @@ export default function App() {
   }, [inventory, isSpoolIdAuto]);
 
   useEffect(() => {
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${wsProtocol}//${window.location.host}/ws`;
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => setConnectionStatus('Connected to Agent');
@@ -399,6 +435,25 @@ export default function App() {
       return `${displayCurrencySymbol}${numericAmount.toFixed(2)}`;
     }
   };
+
+  const formatRemainingTime = (minutes) => {
+    const numeric = Number(minutes);
+    if (!Number.isFinite(numeric) || numeric < 0) return null;
+    const rounded = Math.round(numeric);
+    const hrs = Math.floor(rounded / 60);
+    const mins = rounded % 60;
+    if (hrs <= 0) return `${mins}m`;
+    if (mins === 0) return `${hrs}h`;
+    return `${hrs}h ${mins}m`;
+  };
+
+  const printerStatusLabel = printerStatus.isPrinting
+    ? `Printing${formatRemainingTime(printerStatus.timeRemainingMinutes) ? ` • ${formatRemainingTime(printerStatus.timeRemainingMinutes)} left` : ''}`
+    : 'Idle';
+
+  const printerStatusClasses = printerStatus.isPrinting
+    ? 'bg-amber-500/20 text-amber-300'
+    : 'bg-slate-500/20 text-slate-300';
   const brandOptions = [...new Set(inventory.map((spool) => spool.brand).filter(Boolean))].sort((left, right) => left.localeCompare(right));
   const materialOptions = [...new Set(inventory.map((spool) => spool.material).filter(Boolean))].sort((left, right) => left.localeCompare(right));
   const colourOptions = [...new Set(inventory.map((spool) => spool.color).filter(Boolean))].sort((left, right) => left.localeCompare(right));
@@ -457,13 +512,14 @@ export default function App() {
             <p className="text-slate-300 mt-1 text-sm sm:text-base">Live Filament Tracking for Bambu Lab 3D Printers
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            <button
+          <div className="flex flex-col items-end gap-2">
+            <div className="flex items-center gap-3">
+              <button
               disabled={refreshingAms}
               onClick={async () => {
                 setRefreshingAms(true);
                 try {
-                  await fetch('/api/ams/refresh', { method: 'POST' });
+                  await apiFetch('/api/ams/refresh', { method: 'POST' });
                   await new Promise((r) => setTimeout(r, 1000));
                   await loadAmsState();
                   await loadInventory();
@@ -476,10 +532,14 @@ export default function App() {
               className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold sm:text-sm ${refreshingAms ? 'bg-indigo-500/10 text-indigo-400 cursor-not-allowed' : 'bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30'}`}
             >
               <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 ${refreshingAms ? 'animate-spin' : ''}`} viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" /></svg>
-              {refreshingAms ? 'Refreshing…' : 'Refresh AMS'}
-            </button>
-            <div className={`inline-flex items-center rounded-full px-4 py-2 text-xs font-semibold sm:text-sm ${connectionStatus.includes('Connected') ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}`}>
-              {connectionStatus}
+                {refreshingAms ? 'Refreshing…' : 'Refresh AMS'}
+              </button>
+              <div className={`inline-flex items-center rounded-full px-4 py-2 text-xs font-semibold sm:text-sm ${connectionStatus.includes('Connected') ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}`}>
+                {connectionStatus}
+              </div>
+            </div>
+            <div className={`inline-flex items-center rounded-full px-4 py-2 text-xs font-semibold sm:text-sm ${printerStatusClasses}`}>
+              Printer: {printerStatusLabel}
             </div>
           </div>
         </header>
@@ -516,7 +576,7 @@ export default function App() {
                   const name = colourForm.name.trim();
                   if (!/^#[0-9A-F]{6}$/.test(hex)) { setColourFormError('Invalid hex code (e.g. #FF6A13)'); return; }
                   if (!name) { setColourFormError('Name is required'); return; }
-                  const res = await fetch('/api/colours', {
+                  const res = await apiFetch('/api/colours', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ hex, name }),
@@ -586,7 +646,7 @@ export default function App() {
                                   const hex = editingColourForm.hex.trim().toUpperCase();
                                   const name = editingColourForm.name.trim();
                                   if (!/^#[0-9A-F]{6}$/.test(hex) || !name) return;
-                                  const res = await fetch(`/api/colours/${c.id}`, {
+                                  const res = await apiFetch(`/api/colours/${c.id}`, {
                                     method: 'PUT',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ hex, name }),
@@ -606,7 +666,7 @@ export default function App() {
                               <button
                                 onClick={async () => {
                                   if (!confirm(`Delete colour "${c.name}"?`)) return;
-                                  await fetch(`/api/colours/${c.id}`, { method: 'DELETE' });
+                                  await apiFetch(`/api/colours/${c.id}`, { method: 'DELETE' });
                                   loadColours();
                                 }}
                                 className="rounded bg-rose-700 px-2 py-1 text-xs font-semibold text-white hover:bg-rose-600"
@@ -631,7 +691,7 @@ export default function App() {
                   setMaterialFormError('');
                   const name = materialForm.name.trim();
                   if (!name) { setMaterialFormError('Name is required'); return; }
-                  const res = await fetch('/api/materials', {
+                  const res = await apiFetch('/api/materials', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ name }),
@@ -677,7 +737,7 @@ export default function App() {
                               <button
                                 onClick={async () => {
                                   if (!editingMaterialName.trim()) return;
-                                  const res = await fetch(`/api/materials/${m.id}`, {
+                                  const res = await apiFetch(`/api/materials/${m.id}`, {
                                     method: 'PUT',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ name: editingMaterialName.trim() }),
@@ -697,7 +757,7 @@ export default function App() {
                               <button
                                 onClick={async () => {
                                   if (!confirm(`Delete material "${m.name}"?`)) return;
-                                  await fetch(`/api/materials/${m.id}`, { method: 'DELETE' });
+                                  await apiFetch(`/api/materials/${m.id}`, { method: 'DELETE' });
                                   loadMaterials();
                                 }}
                                 className="rounded bg-rose-700 px-2 py-1 text-xs font-semibold text-white hover:bg-rose-600"

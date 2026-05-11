@@ -356,12 +356,158 @@ const syncAssignedSpoolFromTray = (trayId, gramsRemaining, options = {}) => {
   );
 };
 
+let printerStatus = {
+  state: 'Unknown',
+  isPrinting: false,
+  timeRemainingMinutes: null,
+  updatedAt: null,
+};
+
+let mqttConnected = false;
+let lastPrinterTelemetryAt = 0;
+let lastMqttMessageAt = 0;
+let lastMqttTopic = null;
+let lastPrintTelemetry = null;
+
+const parseRemainingMinutes = (printPayload) => {
+  const candidates = [
+    printPayload.mc_remaining_time,
+    printPayload.remaining_time,
+    printPayload.remain_time,
+    printPayload.time_remaining,
+  ];
+
+  for (const candidate of candidates) {
+    const value = Number(candidate);
+    if (Number.isFinite(value) && value >= 0) {
+      return Math.round(value);
+    }
+  }
+
+  return null;
+};
+
+const parseProgressPercent = (printPayload) => {
+  const candidates = [
+    printPayload.mc_percent,
+    printPayload.percent,
+    printPayload.progress,
+    printPayload.gcode_progress,
+  ];
+
+  for (const candidate of candidates) {
+    const value = Number(candidate);
+    if (Number.isFinite(value) && value >= 0 && value <= 100) {
+      return value;
+    }
+  }
+
+  return null;
+};
+
+const parseLayerProgress = (printPayload) => {
+  const currentCandidates = [
+    printPayload.layer_num,
+    printPayload.current_layer,
+    printPayload.mc_cur_layer,
+  ];
+  const totalCandidates = [
+    printPayload.total_layer_num,
+    printPayload.total_layer,
+    printPayload.mc_total_layer,
+  ];
+
+  let current = null;
+  let total = null;
+
+  for (const candidate of currentCandidates) {
+    const value = Number(candidate);
+    if (Number.isFinite(value) && value >= 0) {
+      current = value;
+      break;
+    }
+  }
+
+  for (const candidate of totalCandidates) {
+    const value = Number(candidate);
+    if (Number.isFinite(value) && value > 0) {
+      total = value;
+      break;
+    }
+  }
+
+  return { current, total };
+};
+
+const capturePrintTelemetry = (printPayload, topic) => {
+  lastPrintTelemetry = {
+    capturedAt: new Date().toISOString(),
+    topic,
+    gcode_state: printPayload.gcode_state ?? null,
+    status: printPayload.status ?? null,
+    mc_remaining_time: printPayload.mc_remaining_time ?? null,
+    remaining_time: printPayload.remaining_time ?? null,
+    remain_time: printPayload.remain_time ?? null,
+    time_remaining: printPayload.time_remaining ?? null,
+    mc_percent: printPayload.mc_percent ?? null,
+    percent: printPayload.percent ?? null,
+    progress: printPayload.progress ?? null,
+    gcode_progress: printPayload.gcode_progress ?? null,
+    layer_num: printPayload.layer_num ?? null,
+    current_layer: printPayload.current_layer ?? null,
+    mc_cur_layer: printPayload.mc_cur_layer ?? null,
+    total_layer_num: printPayload.total_layer_num ?? null,
+    total_layer: printPayload.total_layer ?? null,
+    mc_total_layer: printPayload.mc_total_layer ?? null,
+    availableKeys: Object.keys(printPayload).sort(),
+  };
+};
+
+const updatePrinterStatusFromPayload = (printPayload) => {
+  if (!printPayload || typeof printPayload !== 'object') return;
+
+  lastPrinterTelemetryAt = Date.now();
+
+  const rawState = String(printPayload.gcode_state || printPayload.status || '').trim();
+  const normalized = rawState.toLowerCase();
+  const printingStates = new Set(['running', 'printing', 'prepare', 'preparing', 'resuming', 'paused']);
+  const nonPrintingStates = new Set(['idle', 'finish', 'finished', 'complete', 'completed', 'failed']);
+  const hasExplicitState = Boolean(rawState);
+  const remainingMinutes = parseRemainingMinutes(printPayload);
+  const progressPercent = parseProgressPercent(printPayload);
+  const layerProgress = parseLayerProgress(printPayload);
+  const hasRemainingTime = remainingMinutes !== null;
+  const progressSuggestsPrinting = progressPercent !== null && progressPercent > 0 && progressPercent < 100;
+  const layersSuggestPrinting = layerProgress.current !== null
+    && layerProgress.total !== null
+    && layerProgress.current > 0
+    && layerProgress.current < layerProgress.total;
+
+  const inferredPrinting = (hasRemainingTime && remainingMinutes > 0) || progressSuggestsPrinting || layersSuggestPrinting;
+  const isPrinting = printingStates.has(normalized)
+    || (!nonPrintingStates.has(normalized) && inferredPrinting)
+    || (!hasExplicitState && inferredPrinting);
+
+  // Ignore sparse payloads that carry no status signal, so we don't incorrectly reset to Idle.
+  if (!hasExplicitState && !hasRemainingTime && progressPercent === null && layerProgress.current === null) {
+    return;
+  }
+
+  printerStatus = {
+    state: rawState || (isPrinting ? 'Printing' : 'Idle'),
+    isPrinting,
+    timeRemainingMinutes: isPrinting ? remainingMinutes : null,
+    updatedAt: new Date().toISOString(),
+  };
+};
+
 // --- MQTT Logic ---
 const mqttClient = mqtt.connect(`mqtts://${PRINTER_IP}:8883`, {
   username: 'bblp', password: PRINTER_ACCESS_CODE, rejectUnauthorized: false
 });
 
 mqttClient.on('connect', () => {
+  mqttConnected = true;
   console.log('Connected to Bambu Printer MQTT');
   mqttClient.subscribe(`device/${PRINTER_SERIAL}/report`);
   
@@ -371,15 +517,36 @@ mqttClient.on('connect', () => {
   console.log('Requested full state from printer...');
 });
 
+mqttClient.on('error', (err) => {
+  mqttConnected = false;
+  console.error('MQTT connection error:', err.message || err);
+});
+
+mqttClient.on('close', () => {
+  mqttConnected = false;
+  console.warn('MQTT connection closed');
+});
+
+mqttClient.on('offline', () => {
+  mqttConnected = false;
+  console.warn('MQTT client is offline');
+});
+
 mqttClient.on('message', (topic, message) => {
-  if (!dbReady) {
-    return; // Wait for DB schema migration to complete
-  }
+  lastMqttMessageAt = Date.now();
+  lastMqttTopic = topic;
 
   try {
     const payload = JSON.parse(message.toString());
     
     if (payload.print) {
+      capturePrintTelemetry(payload.print, topic);
+      updatePrinterStatusFromPayload(payload.print);
+
+      if (!dbReady) {
+        return; // Wait for DB schema migration to complete before DB writes.
+      }
+
       // Process Live AMS Hardware Data!
       if (payload.print.ams) {
         const amsData = payload.print.ams.ams[0].tray;
@@ -466,6 +633,44 @@ app.use((req, res, next) => {
 
 app.get('/api/config', (req, res) => {
   res.json({ spoolCostCurrency });
+});
+
+app.get('/api/printer-status', (req, res) => {
+  const telemetryFresh = lastPrinterTelemetryAt > 0 && (Date.now() - lastPrinterTelemetryAt) < 60000;
+  const effectiveConnected = mqttConnected || telemetryFresh;
+
+  if (!effectiveConnected && !printerStatus.updatedAt) {
+    return res.json({
+      ...printerStatus,
+      state: 'Idle',
+      isPrinting: false,
+      timeRemainingMinutes: null,
+      mqttConnected: false,
+    });
+  }
+
+  return res.json({
+    ...printerStatus,
+    mqttConnected: effectiveConnected,
+  });
+});
+
+app.get('/api/printer-status/debug', (req, res) => {
+  const now = Date.now();
+  const lastMqttMessageAgeMs = lastMqttMessageAt > 0 ? (now - lastMqttMessageAt) : null;
+  const lastPrinterTelemetryAgeMs = lastPrinterTelemetryAt > 0 ? (now - lastPrinterTelemetryAt) : null;
+
+  return res.json({
+    mqttConnected,
+    dbReady,
+    lastMqttTopic,
+    lastMqttMessageAt: lastMqttMessageAt > 0 ? new Date(lastMqttMessageAt).toISOString() : null,
+    lastMqttMessageAgeMs,
+    lastPrinterTelemetryAt: lastPrinterTelemetryAt > 0 ? new Date(lastPrinterTelemetryAt).toISOString() : null,
+    lastPrinterTelemetryAgeMs,
+    printerStatus,
+    lastPrintTelemetry,
+  });
 });
 
 app.post('/api/ams/:trayId/stock', (req, res) => {
