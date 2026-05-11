@@ -530,6 +530,8 @@ export default function App() {
               <select value={newSpool.material} onChange={(e) => setNewSpool((prev) => ({ ...prev, material: e.target.value }))} className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-base">
                 <option value="">Select Material</option>
                 <option value="PLA">PLA</option>
+                <option value="PLA Silk+">PLA Silk+</option>
+                <option value="PLA Translucent">PLA Translucent</option>
                 <option value="PETG">PETG</option>
                 <option value="ABS">ABS</option>
                 <option value="TPU">TPU</option>

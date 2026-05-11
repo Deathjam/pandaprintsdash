@@ -83,11 +83,17 @@ db.serialize(() => {
   ];
 
   const seedColoursTable = () => {
-    const insertColour = db.prepare('INSERT OR IGNORE INTO colours (hex, name) VALUES (?, ?)');
-    for (const [hex, name] of seedColours) {
-      insertColour.run(hex, name);
-    }
-    insertColour.finalize();
+    db.run('DELETE FROM colours', (deleteErr) => {
+      if (deleteErr) {
+        console.error('failed to delete existing colours:', deleteErr);
+        return;
+      }
+      const insertColour = db.prepare('INSERT INTO colours (hex, name) VALUES (?, ?)');
+      for (const [hex, name] of seedColours) {
+        insertColour.run(hex, name);
+      }
+      insertColour.finalize();
+    });
   };
 
   const ensureColoursSchema = () => {
@@ -576,7 +582,18 @@ app.post('/api/spools/fetch-url', async (req, res) => {
     return res.status(400).json({ error: 'url is required' });
   }
 
-  const listMaterials = new Set(['PLA','PETG','ABS','TPU','NYLON','PC','ASA','PVA']);
+  const listMaterials = new Set([
+    'PLA',
+    'PETG',
+    'ABS',
+    'TPU',
+    'NYLON',
+    'PC',
+    'ASA',
+    'PVA',
+    'PLA SILK+',
+    'PLA TRANSLUCENT'
+  ]);
   const productPath = (url.match(/\/products\/([^\/?#]+)/i) || [])[1] || '';
   const isBambuLab = /bambulab/i.test(url);
   const fallbackItemType = /refill/i.test(url) ? 'Refill' : 'Spool';
