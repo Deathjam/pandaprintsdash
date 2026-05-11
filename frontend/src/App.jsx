@@ -19,6 +19,19 @@ export default function App() {
   const [refreshingAms, setRefreshingAms] = useState(false);
   const [hexToColorName, setHexToColorName] = useState({});
   const [colorNameToHex, setColorNameToHex] = useState({});
+  const [activeTab, setActiveTab] = useState('dashboard');
+
+  // Library state
+  const [libraryColours, setLibraryColours] = useState([]);
+  const [libraryMaterials, setLibraryMaterials] = useState([]);
+  const [colourForm, setColourForm] = useState({ hex: '#', name: '' });
+  const [colourFormError, setColourFormError] = useState('');
+  const [editingColourId, setEditingColourId] = useState(null);
+  const [editingColourForm, setEditingColourForm] = useState({ hex: '', name: '' });
+  const [materialForm, setMaterialForm] = useState({ name: '' });
+  const [materialFormError, setMaterialFormError] = useState('');
+  const [editingMaterialId, setEditingMaterialId] = useState(null);
+  const [editingMaterialName, setEditingMaterialName] = useState('');
 
   const normalizeHex = (hex) => {
     if (!hex || typeof hex !== 'string') return null;
@@ -103,6 +116,7 @@ export default function App() {
       const res = await fetch('/api/colours');
       if (!res.ok) throw new Error('failed colours fetch');
       const rows = await res.json();
+      setLibraryColours(rows);
       const hexMap = {};
       const nameMap = {};
       for (const { hex, name } of rows) {
@@ -120,6 +134,16 @@ export default function App() {
       setColorNameToHex(nameMap);
     } catch (e) {
       console.error('loadColours error', e);
+    }
+  };
+
+  const loadMaterials = async () => {
+    try {
+      const res = await fetch('/api/materials');
+      if (!res.ok) throw new Error('failed materials fetch');
+      setLibraryMaterials(await res.json());
+    } catch (e) {
+      console.error('loadMaterials error', e);
     }
   };
 
@@ -279,6 +303,7 @@ export default function App() {
   useEffect(() => {
     loadConfig();
     loadColours();
+    loadMaterials();
     loadInventory();
     loadAmsState();
   }, []);
@@ -459,6 +484,238 @@ export default function App() {
           </div>
         </header>
 
+        {/* Tab Navigation */}
+        <nav className="mb-6 flex gap-2 border-b border-slate-700">
+          {[['dashboard', 'Dashboard'], ['library', 'Library']].map(([id, label]) => (
+            <button
+              key={id}
+              onClick={() => setActiveTab(id)}
+              className={`px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${
+                activeTab === id
+                  ? 'border-indigo-400 text-indigo-300'
+                  : 'border-transparent text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
+
+        {activeTab === 'library' && (
+          <div className="space-y-8">
+            {/* Colours Management */}
+            <section className="rounded-xl border border-slate-700/70 bg-slate-800/70 p-6">
+              <h2 className="mb-4 text-xl font-semibold text-slate-100">Colours</h2>
+
+              {/* Add Colour Form */}
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  setColourFormError('');
+                  const hex = colourForm.hex.trim().toUpperCase();
+                  const name = colourForm.name.trim();
+                  if (!/^#[0-9A-F]{6}$/.test(hex)) { setColourFormError('Invalid hex code (e.g. #FF6A13)'); return; }
+                  if (!name) { setColourFormError('Name is required'); return; }
+                  const res = await fetch('/api/colours', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ hex, name }),
+                  });
+                  if (!res.ok) { const d = await res.json(); setColourFormError(d.error || 'Failed'); return; }
+                  setColourForm({ hex: '#', name: '' });
+                  loadColours();
+                }}
+                className="mb-4 flex flex-wrap gap-3 items-end"
+              >
+                <div>
+                  <label className="mb-1 block text-sm text-slate-300">Hex</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      value={colourForm.hex}
+                      onChange={(e) => setColourForm((p) => ({ ...p, hex: e.target.value }))}
+                      placeholder="#FFFFFF"
+                      className="w-32 rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-mono"
+                    />
+                    <div className="h-8 w-8 rounded border border-slate-600" style={{ backgroundColor: /^#[0-9A-Fa-f]{6}$/.test(colourForm.hex) ? colourForm.hex : 'transparent' }} />
+                  </div>
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm text-slate-300">Name</label>
+                  <input
+                    value={colourForm.name}
+                    onChange={(e) => setColourForm((p) => ({ ...p, name: e.target.value }))}
+                    placeholder="Jade White"
+                    className="rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
+                  />
+                </div>
+                <button type="submit" className="rounded bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500">Add Colour</button>
+                {colourFormError && <p className="w-full text-xs text-rose-400">{colourFormError}</p>}
+              </form>
+
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-700 text-left text-xs text-slate-400">
+                      <th className="px-2 py-2">Swatch</th>
+                      <th className="px-2 py-2">Hex</th>
+                      <th className="px-2 py-2">Name</th>
+                      <th className="px-2 py-2">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {libraryColours.map((c) => (
+                      <tr key={c.id} className="border-b border-slate-700/50 hover:bg-slate-700/20">
+                        <td className="px-2 py-1">
+                          <div className="h-6 w-6 rounded border border-slate-600" style={{ backgroundColor: c.hex }} />
+                        </td>
+                        <td className="px-2 py-1 font-mono">
+                          {editingColourId === c.id ? (
+                            <input className="w-28 rounded border border-slate-700 bg-slate-900 px-2 py-1 font-mono text-xs" value={editingColourForm.hex} onChange={(e) => setEditingColourForm((p) => ({ ...p, hex: e.target.value }))} />
+                          ) : c.hex}
+                        </td>
+                        <td className="px-2 py-1">
+                          {editingColourId === c.id ? (
+                            <input className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" value={editingColourForm.name} onChange={(e) => setEditingColourForm((p) => ({ ...p, name: e.target.value }))} />
+                          ) : c.name}
+                        </td>
+                        <td className="px-2 py-1">
+                          {editingColourId === c.id ? (
+                            <div className="flex gap-2">
+                              <button
+                                onClick={async () => {
+                                  const hex = editingColourForm.hex.trim().toUpperCase();
+                                  const name = editingColourForm.name.trim();
+                                  if (!/^#[0-9A-F]{6}$/.test(hex) || !name) return;
+                                  const res = await fetch(`/api/colours/${c.id}`, {
+                                    method: 'PUT',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ hex, name }),
+                                  });
+                                  if (res.ok) { setEditingColourId(null); loadColours(); }
+                                }}
+                                className="rounded bg-emerald-600 px-2 py-1 text-xs font-semibold text-white hover:bg-emerald-500"
+                              >Save</button>
+                              <button onClick={() => setEditingColourId(null)} className="rounded bg-slate-600 px-2 py-1 text-xs font-semibold text-white hover:bg-slate-500">Cancel</button>
+                            </div>
+                          ) : (
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => { setEditingColourId(c.id); setEditingColourForm({ hex: c.hex, name: c.name }); }}
+                                className="rounded bg-slate-600 px-2 py-1 text-xs font-semibold text-white hover:bg-slate-500"
+                              >Edit</button>
+                              <button
+                                onClick={async () => {
+                                  if (!confirm(`Delete colour "${c.name}"?`)) return;
+                                  await fetch(`/api/colours/${c.id}`, { method: 'DELETE' });
+                                  loadColours();
+                                }}
+                                className="rounded bg-rose-700 px-2 py-1 text-xs font-semibold text-white hover:bg-rose-600"
+                              >Delete</button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            {/* Materials Management */}
+            <section className="rounded-xl border border-slate-700/70 bg-slate-800/70 p-6">
+              <h2 className="mb-4 text-xl font-semibold text-slate-100">Materials</h2>
+
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  setMaterialFormError('');
+                  const name = materialForm.name.trim();
+                  if (!name) { setMaterialFormError('Name is required'); return; }
+                  const res = await fetch('/api/materials', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name }),
+                  });
+                  if (!res.ok) { const d = await res.json(); setMaterialFormError(d.error || 'Failed'); return; }
+                  setMaterialForm({ name: '' });
+                  loadMaterials();
+                }}
+                className="mb-4 flex flex-wrap gap-3 items-end"
+              >
+                <div>
+                  <label className="mb-1 block text-sm text-slate-300">Name</label>
+                  <input
+                    value={materialForm.name}
+                    onChange={(e) => setMaterialForm({ name: e.target.value })}
+                    placeholder="PLA Matte"
+                    className="rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
+                  />
+                </div>
+                <button type="submit" className="rounded bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500">Add Material</button>
+                {materialFormError && <p className="w-full text-xs text-rose-400">{materialFormError}</p>}
+              </form>
+
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-700 text-left text-xs text-slate-400">
+                      <th className="px-2 py-2">Name</th>
+                      <th className="px-2 py-2">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {libraryMaterials.map((m) => (
+                      <tr key={m.id} className="border-b border-slate-700/50 hover:bg-slate-700/20">
+                        <td className="px-2 py-1">
+                          {editingMaterialId === m.id ? (
+                            <input className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" value={editingMaterialName} onChange={(e) => setEditingMaterialName(e.target.value)} />
+                          ) : m.name}
+                        </td>
+                        <td className="px-2 py-1">
+                          {editingMaterialId === m.id ? (
+                            <div className="flex gap-2">
+                              <button
+                                onClick={async () => {
+                                  if (!editingMaterialName.trim()) return;
+                                  const res = await fetch(`/api/materials/${m.id}`, {
+                                    method: 'PUT',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ name: editingMaterialName.trim() }),
+                                  });
+                                  if (res.ok) { setEditingMaterialId(null); loadMaterials(); }
+                                }}
+                                className="rounded bg-emerald-600 px-2 py-1 text-xs font-semibold text-white hover:bg-emerald-500"
+                              >Save</button>
+                              <button onClick={() => setEditingMaterialId(null)} className="rounded bg-slate-600 px-2 py-1 text-xs font-semibold text-white hover:bg-slate-500">Cancel</button>
+                            </div>
+                          ) : (
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => { setEditingMaterialId(m.id); setEditingMaterialName(m.name); }}
+                                className="rounded bg-slate-600 px-2 py-1 text-xs font-semibold text-white hover:bg-slate-500"
+                              >Edit</button>
+                              <button
+                                onClick={async () => {
+                                  if (!confirm(`Delete material "${m.name}"?`)) return;
+                                  await fetch(`/api/materials/${m.id}`, { method: 'DELETE' });
+                                  loadMaterials();
+                                }}
+                                className="rounded bg-rose-700 px-2 py-1 text-xs font-semibold text-white hover:bg-rose-600"
+                              >Delete</button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        )}
+
+        {activeTab === 'dashboard' && (
+        <>
         <section className="mb-8">
           <h2 className="mb-4 text-xl font-semibold text-slate-100">Overview</h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
@@ -529,18 +786,9 @@ export default function App() {
               <label className="mb-1 block text-sm text-slate-200">Material</label>
               <select value={newSpool.material} onChange={(e) => setNewSpool((prev) => ({ ...prev, material: e.target.value }))} className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-base">
                 <option value="">Select Material</option>
-                <option value="PLA">PLA</option>
-                <option value="PLA Silk+">PLA Silk+</option>
-                <option value="PLA Translucent">PLA Translucent</option>
-                <option value="PLA Galaxy">PLA Galaxy</option>
-                <option value="PETG">PETG</option>
-                <option value="ABS">ABS</option>
-                <option value="TPU">TPU</option>
-                <option value="Nylon">Nylon</option>
-                <option value="PC">PC</option>
-                <option value="ASA">ASA</option>
-                <option value="PVA">PVA</option>
-                <option value="Other">Other</option>
+                {libraryMaterials.map((m) => (
+                  <option key={m.id} value={m.name}>{m.name}</option>
+                ))}
               </select>
             </div>
             <div>
@@ -732,18 +980,9 @@ export default function App() {
                       {editingSpoolId === spool.id ? (
                         <select className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" value={editedSpool.material ?? ''} onChange={(e) => setEditedSpool((prev) => ({ ...prev, material: e.target.value }))}>
                           <option value="">Select Material</option>
-                          <option value="PLA">PLA</option>
-                          <option value="PLA Silk+">PLA Silk+</option>
-                          <option value="PLA Translucent">PLA Translucent</option>
-                          <option value="PLA Galaxy">PLA Galaxy</option>
-                          <option value="PETG">PETG</option>
-                          <option value="ABS">ABS</option>
-                          <option value="TPU">TPU</option>
-                          <option value="Nylon">Nylon</option>
-                          <option value="PC">PC</option>
-                          <option value="ASA">ASA</option>
-                          <option value="PVA">PVA</option>
-                          <option value="Other">Other</option>
+                          {libraryMaterials.map((m) => (
+                            <option key={m.id} value={m.name}>{m.name}</option>
+                          ))}
                         </select>
                       ) : spool.material || '-'}
                     </td>
@@ -896,7 +1135,7 @@ export default function App() {
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center justify-between rounded-lg bg-slate-900/50 px-3 py-2">
                     <span className="text-slate-400">Material</span>
-                    <span className="font-mono font-bold text-slate-100">{tray.type}</span>
+                    <span className="font-mono font-bold text-slate-100">{currentSpool?.material || tray.type}</span>
                   </div>
                   <div className="flex items-center justify-between rounded-lg bg-slate-900/50 px-3 py-2">
                     <span className="text-slate-400">Used</span>
@@ -962,6 +1201,8 @@ export default function App() {
         </main>
 
         </div>
+        </>
+        )}
 
         <section className="rounded-xl border border-slate-700/70 bg-slate-900/40 p-4 text-center text-xs text-slate-400">
           <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-300">Usage Notes</h2>

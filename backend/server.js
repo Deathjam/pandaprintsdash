@@ -170,6 +170,30 @@ db.serialize(() => {
 
   ensureColoursSchema();
 
+  const seedMaterials = [
+    'PLA',
+    'PLA Silk+',
+    'PLA Translucent',
+    'PLA Galaxy',
+    'PETG',
+    'ABS',
+    'TPU',
+    'Nylon',
+    'PC',
+    'ASA',
+    'PVA'
+  ];
+
+  db.run(`CREATE TABLE IF NOT EXISTS materials (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE
+  )`, (matTableErr) => {
+    if (matTableErr) { console.error('failed to create materials table:', matTableErr); return; }
+    for (const name of seedMaterials) {
+      db.run('INSERT OR IGNORE INTO materials (name) VALUES (?)', [name]);
+    }
+  });
+
   db.run(`CREATE TABLE IF NOT EXISTS spool_inventory (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     spool_id TEXT,
@@ -962,7 +986,7 @@ app.delete('/api/spools/:id', (req, res) => {
 });
 
 app.get('/api/colours', (req, res) => {
-  db.all('SELECT hex, name FROM colours ORDER BY name ASC', [], (err, rows) => {
+  db.all('SELECT id, hex, name FROM colours ORDER BY name ASC', [], (err, rows) => {
     if (err) return res.status(500).json({ error: 'database error' });
     res.json(rows);
   });
@@ -982,28 +1006,85 @@ app.post('/api/colours', (req, res) => {
       if (err.message.includes('UNIQUE')) return res.status(409).json({ error: 'colour already exists' });
       return res.status(500).json({ error: 'database error' });
     }
-    res.status(201).json({ hex: normalizedHex, name: name.trim() });
+    res.status(201).json({ id: this.lastID, hex: normalizedHex, name: name.trim() });
   });
 });
 
-app.put('/api/colours/:hex', (req, res) => {
-  const hex = decodeURIComponent(req.params.hex).trim().toUpperCase();
+app.put('/api/colours/:id', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (Number.isNaN(id)) return res.status(400).json({ error: 'id must be a number' });
+  const { hex, name } = req.body;
+  if (!hex || !name || typeof hex !== 'string' || typeof name !== 'string') {
+    return res.status(400).json({ error: 'hex and name are required' });
+  }
+  const normalizedHex = hex.trim().toUpperCase();
+  if (!/^#[0-9A-F]{6}$/.test(normalizedHex)) {
+    return res.status(400).json({ error: 'hex must be a 6-digit colour code e.g. #FFFFFF' });
+  }
+  db.run('UPDATE colours SET hex = ?, name = ? WHERE id = ?', [normalizedHex, name.trim(), id], function (err) {
+    if (err) {
+      if (err.message.includes('UNIQUE')) return res.status(409).json({ error: 'colour already exists' });
+      return res.status(500).json({ error: 'database error' });
+    }
+    if (this.changes === 0) return res.status(404).json({ error: 'colour not found' });
+    res.json({ id, hex: normalizedHex, name: name.trim() });
+  });
+});
+
+app.delete('/api/colours/:id', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (Number.isNaN(id)) return res.status(400).json({ error: 'id must be a number' });
+  db.run('DELETE FROM colours WHERE id = ?', [id], function (err) {
+    if (err) return res.status(500).json({ error: 'database error' });
+    if (this.changes === 0) return res.status(404).json({ error: 'colour not found' });
+    res.json({ deleted: true });
+  });
+});
+
+app.get('/api/materials', (req, res) => {
+  db.all('SELECT id, name FROM materials ORDER BY name ASC', [], (err, rows) => {
+    if (err) return res.status(500).json({ error: 'database error' });
+    res.json(rows);
+  });
+});
+
+app.post('/api/materials', (req, res) => {
   const { name } = req.body;
   if (!name || typeof name !== 'string' || !name.trim()) {
     return res.status(400).json({ error: 'name is required' });
   }
-  db.run('UPDATE colours SET name = ? WHERE hex = ?', [name.trim(), hex], function (err) {
-    if (err) return res.status(500).json({ error: 'database error' });
-    if (this.changes === 0) return res.status(404).json({ error: 'colour not found' });
-    res.json({ hex, name: name.trim() });
+  db.run('INSERT INTO materials (name) VALUES (?)', [name.trim()], function (err) {
+    if (err) {
+      if (err.message.includes('UNIQUE')) return res.status(409).json({ error: 'material already exists' });
+      return res.status(500).json({ error: 'database error' });
+    }
+    res.status(201).json({ id: this.lastID, name: name.trim() });
   });
 });
 
-app.delete('/api/colours/:hex', (req, res) => {
-  const hex = decodeURIComponent(req.params.hex).trim().toUpperCase();
-  db.run('DELETE FROM colours WHERE hex = ?', [hex], function (err) {
+app.put('/api/materials/:id', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (Number.isNaN(id)) return res.status(400).json({ error: 'id must be a number' });
+  const { name } = req.body;
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return res.status(400).json({ error: 'name is required' });
+  }
+  db.run('UPDATE materials SET name = ? WHERE id = ?', [name.trim(), id], function (err) {
+    if (err) {
+      if (err.message.includes('UNIQUE')) return res.status(409).json({ error: 'material already exists' });
+      return res.status(500).json({ error: 'database error' });
+    }
+    if (this.changes === 0) return res.status(404).json({ error: 'material not found' });
+    res.json({ id, name: name.trim() });
+  });
+});
+
+app.delete('/api/materials/:id', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (Number.isNaN(id)) return res.status(400).json({ error: 'id must be a number' });
+  db.run('DELETE FROM materials WHERE id = ?', [id], function (err) {
     if (err) return res.status(500).json({ error: 'database error' });
-    if (this.changes === 0) return res.status(404).json({ error: 'colour not found' });
+    if (this.changes === 0) return res.status(404).json({ error: 'material not found' });
     res.json({ deleted: true });
   });
 });
