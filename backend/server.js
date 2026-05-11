@@ -79,7 +79,9 @@ db.serialize(() => {
     ['#9D2235', 'Maroon Red'],
     ['#0056B8', 'Cobalt Blue'],
     ['#000000', 'Black'],
-    ['#000000', 'ABS Black']
+    ['#000000', 'ABS Black'],
+    ['#f3cfb2', 'Champagne'],
+    ['#96d8af', 'Light Jade'],
   ];
 
   const seedColoursTable = () => {
