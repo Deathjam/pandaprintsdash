@@ -532,6 +532,7 @@ export default function App() {
                 <option value="PLA">PLA</option>
                 <option value="PLA Silk+">PLA Silk+</option>
                 <option value="PLA Translucent">PLA Translucent</option>
+                <option value="PLA Galaxy">PLA Galaxy</option>
                 <option value="PETG">PETG</option>
                 <option value="ABS">ABS</option>
                 <option value="TPU">TPU</option>
@@ -729,7 +730,21 @@ export default function App() {
                     </td>
                     <td className="px-2 py-1">
                       {editingSpoolId === spool.id ? (
-                        <input className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" value={editedSpool.material ?? ''} onChange={(e) => setEditedSpool((prev) => ({ ...prev, material: e.target.value }))} />
+                        <select className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" value={editedSpool.material ?? ''} onChange={(e) => setEditedSpool((prev) => ({ ...prev, material: e.target.value }))}>
+                          <option value="">Select Material</option>
+                          <option value="PLA">PLA</option>
+                          <option value="PLA Silk+">PLA Silk+</option>
+                          <option value="PLA Translucent">PLA Translucent</option>
+                          <option value="PLA Galaxy">PLA Galaxy</option>
+                          <option value="PETG">PETG</option>
+                          <option value="ABS">ABS</option>
+                          <option value="TPU">TPU</option>
+                          <option value="Nylon">Nylon</option>
+                          <option value="PC">PC</option>
+                          <option value="ASA">ASA</option>
+                          <option value="PVA">PVA</option>
+                          <option value="Other">Other</option>
+                        </select>
                       ) : spool.material || '-'}
                     </td>
                     <td className="px-2 py-1">

@@ -82,7 +82,7 @@ db.serialize(() => {
     ['#000000', 'ABS Black'],
     ['#f3cfb2', 'Champagne'],
     ['#96d8af', 'Light Jade'],
-    ['#594177', 'Galaxy']
+    ['#594177', 'Purple']
   ];
 
   const seedColoursTable = () => {
@@ -595,7 +595,8 @@ app.post('/api/spools/fetch-url', async (req, res) => {
     'ASA',
     'PVA',
     'PLA SILK+',
-    'PLA TRANSLUCENT'
+    'PLA TRANSLUCENT',
+    'PLA GALAXY'
   ]);
   const productPath = (url.match(/\/products\/([^\/?#]+)/i) || [])[1] || '';
   const isBambuLab = /bambulab/i.test(url);
