@@ -82,6 +82,7 @@ db.serialize(() => {
     ['#000000', 'ABS Black'],
     ['#f3cfb2', 'Champagne'],
     ['#96d8af', 'Light Jade'],
+    ['#594177', 'Galaxy']
   ];
 
   const seedColoursTable = () => {
