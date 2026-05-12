@@ -86,12 +86,16 @@ db.serialize(() => {
   ];
 
   const seedColoursTable = () => {
-    db.run('DELETE FROM colours', (deleteErr) => {
-      if (deleteErr) {
-        console.error('failed to delete existing colours:', deleteErr);
+    db.get('SELECT COUNT(*) as count FROM colours', [], (countErr, row) => {
+      if (countErr) {
+        console.error('failed to count colours:', countErr);
         return;
       }
-      const insertColour = db.prepare('INSERT INTO colours (hex, name) VALUES (?, ?)');
+      if (row && row.count > 0) {
+        // Table already has data — don't overwrite user-added colours
+        return;
+      }
+      const insertColour = db.prepare('INSERT OR IGNORE INTO colours (hex, name) VALUES (?, ?)');
       for (const [hex, name] of seedColours) {
         insertColour.run(hex, name);
       }
@@ -245,6 +249,22 @@ db.serialize(() => {
       });
     }
   });
+
+  db.run(`CREATE TABLE IF NOT EXISTS brand (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    description TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS supplier (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    contact TEXT,
+    email TEXT,
+    address TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`);
 });
 
 let dbReady = false;
@@ -1290,6 +1310,110 @@ app.delete('/api/materials/:id', (req, res) => {
   db.run('DELETE FROM materials WHERE id = ?', [id], function (err) {
     if (err) return res.status(500).json({ error: 'database error' });
     if (this.changes === 0) return res.status(404).json({ error: 'material not found' });
+    res.json({ deleted: true });
+  });
+});
+
+app.get('/api/brands', (req, res) => {
+  db.all('SELECT id, name, description FROM brand ORDER BY name ASC', [], (err, rows) => {
+    if (err) return res.status(500).json({ error: 'database error' });
+    res.json(rows);
+  });
+});
+
+app.post('/api/brands', (req, res) => {
+  const { name, description } = req.body;
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return res.status(400).json({ error: 'name is required' });
+  }
+  db.run('INSERT INTO brand (name, description) VALUES (?, ?)', [name.trim(), description || null], function (err) {
+    if (err) {
+      if (err.message.includes('UNIQUE')) return res.status(409).json({ error: 'brand already exists' });
+      return res.status(500).json({ error: 'database error' });
+    }
+    res.status(201).json({ id: this.lastID, name: name.trim(), description: description || null });
+  });
+});
+
+app.put('/api/brands/:id', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (Number.isNaN(id)) return res.status(400).json({ error: 'id must be a number' });
+  const { name, description } = req.body;
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return res.status(400).json({ error: 'name is required' });
+  }
+  db.run('UPDATE brand SET name = ?, description = ? WHERE id = ?', [name.trim(), description || null, id], function (err) {
+    if (err) {
+      if (err.message.includes('UNIQUE')) return res.status(409).json({ error: 'brand already exists' });
+      return res.status(500).json({ error: 'database error' });
+    }
+    if (this.changes === 0) return res.status(404).json({ error: 'brand not found' });
+    res.json({ id, name: name.trim(), description: description || null });
+  });
+});
+
+app.delete('/api/brands/:id', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (Number.isNaN(id)) return res.status(400).json({ error: 'id must be a number' });
+  db.run('DELETE FROM brand WHERE id = ?', [id], function (err) {
+    if (err) return res.status(500).json({ error: 'database error' });
+    if (this.changes === 0) return res.status(404).json({ error: 'brand not found' });
+    res.json({ deleted: true });
+  });
+});
+
+app.get('/api/suppliers', (req, res) => {
+  db.all('SELECT id, name FROM supplier ORDER BY name ASC', [], (err, rows) => {
+    if (err) return res.status(500).json({ error: 'database error' });
+    res.json(rows);
+  });
+});
+
+app.post('/api/suppliers', (req, res) => {
+  const { name } = req.body;
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return res.status(400).json({ error: 'name is required' });
+  }
+  db.run('INSERT INTO supplier (name) VALUES (?)', 
+    [name.trim()], function (err) {
+    if (err) {
+      if (err.message.includes('UNIQUE')) return res.status(409).json({ error: 'supplier already exists' });
+      return res.status(500).json({ error: 'database error' });
+    }
+    res.status(201).json({ 
+      id: this.lastID, 
+      name: name.trim()
+    });
+  });
+});
+
+app.put('/api/suppliers/:id', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (Number.isNaN(id)) return res.status(400).json({ error: 'id must be a number' });
+  const { name } = req.body;
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return res.status(400).json({ error: 'name is required' });
+  }
+  db.run('UPDATE supplier SET name = ? WHERE id = ?', 
+    [name.trim(), id], function (err) {
+    if (err) {
+      if (err.message.includes('UNIQUE')) return res.status(409).json({ error: 'supplier already exists' });
+      return res.status(500).json({ error: 'database error' });
+    }
+    if (this.changes === 0) return res.status(404).json({ error: 'supplier not found' });
+    res.json({ 
+      id, 
+      name: name.trim()
+    });
+  });
+});
+
+app.delete('/api/suppliers/:id', (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (Number.isNaN(id)) return res.status(400).json({ error: 'id must be a number' });
+  db.run('DELETE FROM supplier WHERE id = ?', [id], function (err) {
+    if (err) return res.status(500).json({ error: 'database error' });
+    if (this.changes === 0) return res.status(404).json({ error: 'supplier not found' });
     res.json({ deleted: true });
   });
 });

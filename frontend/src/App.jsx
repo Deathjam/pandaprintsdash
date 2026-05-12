@@ -35,6 +35,8 @@ export default function App() {
   // Library state
   const [libraryColours, setLibraryColours] = useState([]);
   const [libraryMaterials, setLibraryMaterials] = useState([]);
+  const [libraryBrands, setLibraryBrands] = useState([]);
+  const [librarySuppliers, setLibrarySuppliers] = useState([]);
   const [colourForm, setColourForm] = useState({ hex: '#', name: '' });
   const [colourFormError, setColourFormError] = useState('');
   const [editingColourId, setEditingColourId] = useState(null);
@@ -43,6 +45,14 @@ export default function App() {
   const [materialFormError, setMaterialFormError] = useState('');
   const [editingMaterialId, setEditingMaterialId] = useState(null);
   const [editingMaterialName, setEditingMaterialName] = useState('');
+  const [brandForm, setBrandForm] = useState({ name: '', description: '' });
+  const [brandFormError, setBrandFormError] = useState('');
+  const [editingBrandId, setEditingBrandId] = useState(null);
+  const [editingBrandForm, setEditingBrandForm] = useState({ name: '', description: '' });
+  const [supplierForm, setSupplierForm] = useState({ name: '' });
+  const [supplierFormError, setSupplierFormError] = useState('');
+  const [editingSupplierId, setEditingSupplierId] = useState(null);
+  const [editingSupplierForm, setEditingSupplierForm] = useState({ name: '' });
 
   const normalizeHex = (hex) => {
     if (!hex || typeof hex !== 'string') return null;
@@ -155,6 +165,26 @@ export default function App() {
       setLibraryMaterials(await res.json());
     } catch (e) {
       console.error('loadMaterials error', e);
+    }
+  };
+
+  const loadBrands = async () => {
+    try {
+      const res = await apiFetch('/api/brands');
+      if (!res.ok) throw new Error('failed brands fetch');
+      setLibraryBrands(await res.json());
+    } catch (e) {
+      console.error('loadBrands error', e);
+    }
+  };
+
+  const loadSuppliers = async () => {
+    try {
+      const res = await apiFetch('/api/suppliers');
+      if (!res.ok) throw new Error('failed suppliers fetch');
+      setLibrarySuppliers(await res.json());
+    } catch (e) {
+      console.error('loadSuppliers error', e);
     }
   };
 
@@ -333,6 +363,8 @@ export default function App() {
     loadConfig();
     loadColours();
     loadMaterials();
+    loadBrands();
+    loadSuppliers();
     loadInventory();
     loadAmsState();
     loadPrinterStatus();
@@ -563,11 +595,17 @@ export default function App() {
 
         {activeTab === 'library' && (
           <div className="space-y-8">
-            {/* Colours Management */}
-            <section className="rounded-xl border border-slate-700/70 bg-slate-800/70 p-6">
-              <h2 className="mb-4 text-xl font-semibold text-slate-100">Colours</h2>
 
-              {/* Add Colour Form */}
+            {/* Colours */}
+            <section className="rounded-2xl border border-slate-700/70 bg-slate-800/70 p-6 shadow-[0_8px_20px_-8px_rgba(15,23,42,0.6)]">
+              <div className="mb-5 flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold text-slate-100">Colours</h2>
+                  <p className="mt-0.5 text-xs text-slate-400">{libraryColours.length} colour{libraryColours.length !== 1 ? 's' : ''} in library</p>
+                </div>
+              </div>
+
+              {/* Add form */}
               <form
                 onSubmit={async (e) => {
                   e.preventDefault();
@@ -585,192 +623,339 @@ export default function App() {
                   setColourForm({ hex: '#', name: '' });
                   loadColours();
                 }}
-                className="mb-4 flex flex-wrap gap-3 items-end"
+                className="mb-6 flex flex-wrap items-end gap-3 rounded-xl border border-slate-700/50 bg-slate-900/50 p-4"
               >
                 <div>
-                  <label className="mb-1 block text-sm text-slate-300">Hex</label>
+                  <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Hex Code</label>
                   <div className="flex items-center gap-2">
+                    <div className="h-9 w-9 flex-shrink-0 rounded-lg border-2 border-slate-600 shadow-inner transition-colors" style={{ backgroundColor: /^#[0-9A-Fa-f]{6}$/.test(colourForm.hex) ? colourForm.hex : 'transparent' }} />
                     <input
                       value={colourForm.hex}
                       onChange={(e) => setColourForm((p) => ({ ...p, hex: e.target.value }))}
                       placeholder="#FFFFFF"
-                      className="w-32 rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-mono"
+                      className="w-32 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 font-mono text-sm text-slate-100 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30"
                     />
-                    <div className="h-8 w-8 rounded border border-slate-600" style={{ backgroundColor: /^#[0-9A-Fa-f]{6}$/.test(colourForm.hex) ? colourForm.hex : 'transparent' }} />
                   </div>
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm text-slate-300">Name</label>
+                  <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">Name</label>
                   <input
                     value={colourForm.name}
                     onChange={(e) => setColourForm((p) => ({ ...p, name: e.target.value }))}
                     placeholder="Jade White"
-                    className="rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
+                    className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30"
                   />
                 </div>
-                <button type="submit" className="rounded bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500">Add Colour</button>
+                <button type="submit" className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500 active:scale-95">
+                  + Add Colour
+                </button>
                 {colourFormError && <p className="w-full text-xs text-rose-400">{colourFormError}</p>}
               </form>
 
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-700 text-left text-xs text-slate-400">
-                      <th className="px-2 py-2">Swatch</th>
-                      <th className="px-2 py-2">Hex</th>
-                      <th className="px-2 py-2">Name</th>
-                      <th className="px-2 py-2">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {libraryColours.map((c) => (
-                      <tr key={c.id} className="border-b border-slate-700/50 hover:bg-slate-700/20">
-                        <td className="px-2 py-1">
-                          <div className="h-6 w-6 rounded border border-slate-600" style={{ backgroundColor: c.hex }} />
-                        </td>
-                        <td className="px-2 py-1 font-mono">
-                          {editingColourId === c.id ? (
-                            <input className="w-28 rounded border border-slate-700 bg-slate-900 px-2 py-1 font-mono text-xs" value={editingColourForm.hex} onChange={(e) => setEditingColourForm((p) => ({ ...p, hex: e.target.value }))} />
-                          ) : c.hex}
-                        </td>
-                        <td className="px-2 py-1">
-                          {editingColourId === c.id ? (
-                            <input className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" value={editingColourForm.name} onChange={(e) => setEditingColourForm((p) => ({ ...p, name: e.target.value }))} />
-                          ) : c.name}
-                        </td>
-                        <td className="px-2 py-1">
-                          {editingColourId === c.id ? (
-                            <div className="flex gap-2">
-                              <button
-                                onClick={async () => {
-                                  const hex = editingColourForm.hex.trim().toUpperCase();
-                                  const name = editingColourForm.name.trim();
-                                  if (!/^#[0-9A-F]{6}$/.test(hex) || !name) return;
-                                  const res = await apiFetch(`/api/colours/${c.id}`, {
-                                    method: 'PUT',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ hex, name }),
-                                  });
-                                  if (res.ok) { setEditingColourId(null); loadColours(); }
-                                }}
-                                className="rounded bg-emerald-600 px-2 py-1 text-xs font-semibold text-white hover:bg-emerald-500"
-                              >Save</button>
-                              <button onClick={() => setEditingColourId(null)} className="rounded bg-slate-600 px-2 py-1 text-xs font-semibold text-white hover:bg-slate-500">Cancel</button>
-                            </div>
-                          ) : (
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => { setEditingColourId(c.id); setEditingColourForm({ hex: c.hex, name: c.name }); }}
-                                className="rounded bg-slate-600 px-2 py-1 text-xs font-semibold text-white hover:bg-slate-500"
-                              >Edit</button>
-                              <button
-                                onClick={async () => {
-                                  if (!confirm(`Delete colour "${c.name}"?`)) return;
-                                  await apiFetch(`/api/colours/${c.id}`, { method: 'DELETE' });
-                                  loadColours();
-                                }}
-                                className="rounded bg-rose-700 px-2 py-1 text-xs font-semibold text-white hover:bg-rose-600"
-                              >Delete</button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              {/* Colour grid */}
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
+                {libraryColours.map((c) => (
+                  <div key={c.id} className="group relative flex flex-col items-center gap-2 rounded-xl border border-slate-700/50 bg-slate-900/60 p-3 transition hover:border-slate-600 hover:bg-slate-900/80">
+                    {editingColourId === c.id ? (
+                      <div className="flex w-full flex-col gap-2">
+                        <div className="flex items-center gap-1.5">
+                          <div className="h-7 w-7 flex-shrink-0 rounded border border-slate-600" style={{ backgroundColor: /^#[0-9A-Fa-f]{6}$/.test(editingColourForm.hex) ? editingColourForm.hex : 'transparent' }} />
+                          <input className="w-full rounded border border-slate-700 bg-slate-800 px-2 py-1 font-mono text-xs text-slate-100 outline-none focus:border-indigo-500" value={editingColourForm.hex} onChange={(e) => setEditingColourForm((p) => ({ ...p, hex: e.target.value }))} />
+                        </div>
+                        <input className="w-full rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-100 outline-none focus:border-indigo-500" value={editingColourForm.name} onChange={(e) => setEditingColourForm((p) => ({ ...p, name: e.target.value }))} />
+                        <div className="flex gap-1">
+                          <button
+                            onClick={async () => {
+                              const hex = editingColourForm.hex.trim().toUpperCase();
+                              const name = editingColourForm.name.trim();
+                              if (!/^#[0-9A-F]{6}$/.test(hex) || !name) return;
+                              const res = await apiFetch(`/api/colours/${c.id}`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ hex, name }),
+                              });
+                              if (res.ok) { setEditingColourId(null); loadColours(); }
+                            }}
+                            className="flex-1 rounded bg-emerald-600 py-1 text-xs font-semibold text-white hover:bg-emerald-500"
+                          >Save</button>
+                          <button onClick={() => setEditingColourId(null)} className="flex-1 rounded bg-slate-600 py-1 text-xs font-semibold text-white hover:bg-slate-500">Cancel</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="h-12 w-12 rounded-full border-4 border-slate-700 shadow-inner transition-transform group-hover:scale-105" style={{ backgroundColor: c.hex }} />
+                        <div className="w-full text-center">
+                          <p className="truncate text-xs font-medium text-slate-200">{c.name}</p>
+                          <p className="font-mono text-[10px] text-slate-500">{c.hex}</p>
+                        </div>
+                        <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                          <button
+                            onClick={() => { setEditingColourId(c.id); setEditingColourForm({ hex: c.hex, name: c.name }); }}
+                            className="rounded bg-slate-700 px-2 py-0.5 text-[10px] font-semibold text-slate-200 hover:bg-slate-600"
+                          >Edit</button>
+                          <button
+                            onClick={async () => {
+                              if (!confirm(`Delete colour "${c.name}"?`)) return;
+                              await apiFetch(`/api/colours/${c.id}`, { method: 'DELETE' });
+                              loadColours();
+                            }}
+                            className="rounded bg-rose-900/60 px-2 py-0.5 text-[10px] font-semibold text-rose-300 hover:bg-rose-800/60"
+                          >Delete</button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))}
               </div>
             </section>
 
-            {/* Materials Management */}
-            <section className="rounded-xl border border-slate-700/70 bg-slate-800/70 p-6">
-              <h2 className="mb-4 text-xl font-semibold text-slate-100">Materials</h2>
+            {/* Bottom 3 sections in a grid */}
+            <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
 
-              <form
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  setMaterialFormError('');
-                  const name = materialForm.name.trim();
-                  if (!name) { setMaterialFormError('Name is required'); return; }
-                  const res = await apiFetch('/api/materials', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name }),
-                  });
-                  if (!res.ok) { const d = await res.json(); setMaterialFormError(d.error || 'Failed'); return; }
-                  setMaterialForm({ name: '' });
-                  loadMaterials();
-                }}
-                className="mb-4 flex flex-wrap gap-3 items-end"
-              >
-                <div>
-                  <label className="mb-1 block text-sm text-slate-300">Name</label>
+              {/* Materials */}
+              <section className="rounded-2xl border border-slate-700/70 bg-slate-800/70 p-6 shadow-[0_8px_20px_-8px_rgba(15,23,42,0.6)]">
+                <div className="mb-5">
+                  <h2 className="text-xl font-semibold text-slate-100">Materials</h2>
+                  <p className="mt-0.5 text-xs text-slate-400">{libraryMaterials.length} material{libraryMaterials.length !== 1 ? 's' : ''}</p>
+                </div>
+
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    setMaterialFormError('');
+                    const name = materialForm.name.trim();
+                    if (!name) { setMaterialFormError('Name is required'); return; }
+                    const res = await apiFetch('/api/materials', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ name }),
+                    });
+                    if (!res.ok) { const d = await res.json(); setMaterialFormError(d.error || 'Failed'); return; }
+                    setMaterialForm({ name: '' });
+                    loadMaterials();
+                  }}
+                  className="mb-5 flex gap-2"
+                >
                   <input
                     value={materialForm.name}
                     onChange={(e) => setMaterialForm({ name: e.target.value })}
-                    placeholder="PLA Matte"
-                    className="rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm"
+                    placeholder="e.g. PLA Matte"
+                    className="flex-1 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30"
                   />
-                </div>
-                <button type="submit" className="rounded bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500">Add Material</button>
-                {materialFormError && <p className="w-full text-xs text-rose-400">{materialFormError}</p>}
-              </form>
+                  <button type="submit" className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500 active:scale-95">+</button>
+                  {materialFormError && <p className="mt-1 w-full text-xs text-rose-400">{materialFormError}</p>}
+                </form>
 
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-700 text-left text-xs text-slate-400">
-                      <th className="px-2 py-2">Name</th>
-                      <th className="px-2 py-2">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {libraryMaterials.map((m) => (
-                      <tr key={m.id} className="border-b border-slate-700/50 hover:bg-slate-700/20">
-                        <td className="px-2 py-1">
-                          {editingMaterialId === m.id ? (
-                            <input className="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" value={editingMaterialName} onChange={(e) => setEditingMaterialName(e.target.value)} />
-                          ) : m.name}
-                        </td>
-                        <td className="px-2 py-1">
-                          {editingMaterialId === m.id ? (
-                            <div className="flex gap-2">
-                              <button
-                                onClick={async () => {
-                                  if (!editingMaterialName.trim()) return;
-                                  const res = await apiFetch(`/api/materials/${m.id}`, {
-                                    method: 'PUT',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ name: editingMaterialName.trim() }),
-                                  });
-                                  if (res.ok) { setEditingMaterialId(null); loadMaterials(); }
-                                }}
-                                className="rounded bg-emerald-600 px-2 py-1 text-xs font-semibold text-white hover:bg-emerald-500"
-                              >Save</button>
-                              <button onClick={() => setEditingMaterialId(null)} className="rounded bg-slate-600 px-2 py-1 text-xs font-semibold text-white hover:bg-slate-500">Cancel</button>
-                            </div>
-                          ) : (
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => { setEditingMaterialId(m.id); setEditingMaterialName(m.name); }}
-                                className="rounded bg-slate-600 px-2 py-1 text-xs font-semibold text-white hover:bg-slate-500"
-                              >Edit</button>
-                              <button
-                                onClick={async () => {
-                                  if (!confirm(`Delete material "${m.name}"?`)) return;
-                                  await apiFetch(`/api/materials/${m.id}`, { method: 'DELETE' });
-                                  loadMaterials();
-                                }}
-                                className="rounded bg-rose-700 px-2 py-1 text-xs font-semibold text-white hover:bg-rose-600"
-                              >Delete</button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </section>
+                <ul className="space-y-1.5">
+                  {libraryMaterials.map((m) => (
+                    <li key={m.id} className="group flex items-center justify-between rounded-lg border border-slate-700/40 bg-slate-900/50 px-3 py-2 transition hover:border-slate-600/60 hover:bg-slate-900/80">
+                      {editingMaterialId === m.id ? (
+                        <div className="flex w-full gap-2">
+                          <input className="flex-1 rounded border border-slate-700 bg-slate-800 px-2 py-1 text-sm text-slate-100 outline-none focus:border-indigo-500" value={editingMaterialName} onChange={(e) => setEditingMaterialName(e.target.value)} autoFocus />
+                          <button
+                            onClick={async () => {
+                              if (!editingMaterialName.trim()) return;
+                              const res = await apiFetch(`/api/materials/${m.id}`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ name: editingMaterialName.trim() }),
+                              });
+                              if (res.ok) { setEditingMaterialId(null); loadMaterials(); }
+                            }}
+                            className="rounded bg-emerald-600 px-2 py-1 text-xs font-semibold text-white hover:bg-emerald-500"
+                          >Save</button>
+                          <button onClick={() => setEditingMaterialId(null)} className="rounded bg-slate-600 px-2 py-1 text-xs font-semibold text-white hover:bg-slate-500">✕</button>
+                        </div>
+                      ) : (
+                        <>
+                          <span className="text-sm font-medium text-slate-200">{m.name}</span>
+                          <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                            <button onClick={() => { setEditingMaterialId(m.id); setEditingMaterialName(m.name); }} className="rounded bg-slate-700 px-2 py-0.5 text-xs font-medium text-slate-300 hover:bg-slate-600">Edit</button>
+                            <button
+                              onClick={async () => {
+                                if (!confirm(`Delete material "${m.name}"?`)) return;
+                                await apiFetch(`/api/materials/${m.id}`, { method: 'DELETE' });
+                                loadMaterials();
+                              }}
+                              className="rounded bg-rose-900/50 px-2 py-0.5 text-xs font-medium text-rose-300 hover:bg-rose-800/60"
+                            >Delete</button>
+                          </div>
+                        </>
+                      )}
+                    </li>
+                  ))}
+                  {libraryMaterials.length === 0 && <li className="py-4 text-center text-xs text-slate-500">No materials yet</li>}
+                </ul>
+              </section>
+
+              {/* Brands */}
+              <section className="rounded-2xl border border-slate-700/70 bg-slate-800/70 p-6 shadow-[0_8px_20px_-8px_rgba(15,23,42,0.6)]">
+                <div className="mb-5">
+                  <h2 className="text-xl font-semibold text-slate-100">Brands</h2>
+                  <p className="mt-0.5 text-xs text-slate-400">{libraryBrands.length} brand{libraryBrands.length !== 1 ? 's' : ''}</p>
+                </div>
+
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    setBrandFormError('');
+                    const name = brandForm.name.trim();
+                    const description = brandForm.description.trim();
+                    if (!name) { setBrandFormError('Name is required'); return; }
+                    const res = await apiFetch('/api/brands', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ name, description: description || null }),
+                    });
+                    if (!res.ok) { const d = await res.json(); setBrandFormError(d.error || 'Failed'); return; }
+                    setBrandForm({ name: '', description: '' });
+                    loadBrands();
+                  }}
+                  className="mb-5 space-y-2"
+                >
+                  <div className="flex gap-2">
+                    <input
+                      value={brandForm.name}
+                      onChange={(e) => setBrandForm({ ...brandForm, name: e.target.value })}
+                      placeholder="Brand name"
+                      className="flex-1 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30"
+                    />
+                    <button type="submit" className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500 active:scale-95">+</button>
+                  </div>
+                  <input
+                    value={brandForm.description}
+                    onChange={(e) => setBrandForm({ ...brandForm, description: e.target.value })}
+                    placeholder="Description (optional)"
+                    className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30"
+                  />
+                  {brandFormError && <p className="text-xs text-rose-400">{brandFormError}</p>}
+                </form>
+
+                <ul className="space-y-1.5">
+                  {libraryBrands.map((b) => (
+                    <li key={b.id} className="group rounded-lg border border-slate-700/40 bg-slate-900/50 px-3 py-2 transition hover:border-slate-600/60 hover:bg-slate-900/80">
+                      {editingBrandId === b.id ? (
+                        <div className="space-y-2">
+                          <input className="w-full rounded border border-slate-700 bg-slate-800 px-2 py-1 text-sm text-slate-100 outline-none focus:border-indigo-500" value={editingBrandForm.name} onChange={(e) => setEditingBrandForm((p) => ({ ...p, name: e.target.value }))} autoFocus />
+                          <input className="w-full rounded border border-slate-700 bg-slate-800 px-2 py-1 text-sm text-slate-100 outline-none focus:border-indigo-500" value={editingBrandForm.description || ''} onChange={(e) => setEditingBrandForm((p) => ({ ...p, description: e.target.value }))} placeholder="Description" />
+                          <div className="flex gap-1">
+                            <button
+                              onClick={async () => {
+                                if (!editingBrandForm.name.trim()) return;
+                                const res = await apiFetch(`/api/brands/${b.id}`, {
+                                  method: 'PUT',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ name: editingBrandForm.name.trim(), description: editingBrandForm.description.trim() || null }),
+                                });
+                                if (res.ok) { setEditingBrandId(null); loadBrands(); }
+                              }}
+                              className="rounded bg-emerald-600 px-2 py-1 text-xs font-semibold text-white hover:bg-emerald-500"
+                            >Save</button>
+                            <button onClick={() => setEditingBrandId(null)} className="rounded bg-slate-600 px-2 py-1 text-xs font-semibold text-white hover:bg-slate-500">Cancel</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-slate-200">{b.name}</p>
+                            {b.description && <p className="truncate text-xs text-slate-500">{b.description}</p>}
+                          </div>
+                          <div className="flex flex-shrink-0 gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                            <button onClick={() => { setEditingBrandId(b.id); setEditingBrandForm({ name: b.name, description: b.description || '' }); }} className="rounded bg-slate-700 px-2 py-0.5 text-xs font-medium text-slate-300 hover:bg-slate-600">Edit</button>
+                            <button
+                              onClick={async () => {
+                                if (!confirm(`Delete brand "${b.name}"?`)) return;
+                                await apiFetch(`/api/brands/${b.id}`, { method: 'DELETE' });
+                                loadBrands();
+                              }}
+                              className="rounded bg-rose-900/50 px-2 py-0.5 text-xs font-medium text-rose-300 hover:bg-rose-800/60"
+                            >Delete</button>
+                          </div>
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                  {libraryBrands.length === 0 && <li className="py-4 text-center text-xs text-slate-500">No brands yet</li>}
+                </ul>
+              </section>
+
+              {/* Suppliers */}
+              <section className="rounded-2xl border border-slate-700/70 bg-slate-800/70 p-6 shadow-[0_8px_20px_-8px_rgba(15,23,42,0.6)]">
+                <div className="mb-5">
+                  <h2 className="text-xl font-semibold text-slate-100">Suppliers</h2>
+                  <p className="mt-0.5 text-xs text-slate-400">{librarySuppliers.length} supplier{librarySuppliers.length !== 1 ? 's' : ''}</p>
+                </div>
+
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    setSupplierFormError('');
+                    const name = supplierForm.name.trim();
+                    if (!name) { setSupplierFormError('Name is required'); return; }
+                    const res = await apiFetch('/api/suppliers', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ name }),
+                    });
+                    if (!res.ok) { const d = await res.json(); setSupplierFormError(d.error || 'Failed'); return; }
+                    setSupplierForm({ name: '' });
+                    loadSuppliers();
+                  }}
+                  className="mb-5 flex gap-2"
+                >
+                  <input
+                    value={supplierForm.name}
+                    onChange={(e) => setSupplierForm({ ...supplierForm, name: e.target.value })}
+                    placeholder="e.g. Bambu Lab"
+                    className="flex-1 rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30"
+                  />
+                  <button type="submit" className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500 active:scale-95">+</button>
+                  {supplierFormError && <p className="mt-1 w-full text-xs text-rose-400">{supplierFormError}</p>}
+                </form>
+
+                <ul className="space-y-1.5">
+                  {librarySuppliers.map((s) => (
+                    <li key={s.id} className="group flex items-center justify-between rounded-lg border border-slate-700/40 bg-slate-900/50 px-3 py-2 transition hover:border-slate-600/60 hover:bg-slate-900/80">
+                      {editingSupplierId === s.id ? (
+                        <div className="flex w-full gap-2">
+                          <input className="flex-1 rounded border border-slate-700 bg-slate-800 px-2 py-1 text-sm text-slate-100 outline-none focus:border-indigo-500" value={editingSupplierForm.name} onChange={(e) => setEditingSupplierForm((p) => ({ ...p, name: e.target.value }))} autoFocus />
+                          <button
+                            onClick={async () => {
+                              if (!editingSupplierForm.name.trim()) return;
+                              const res = await apiFetch(`/api/suppliers/${s.id}`, {
+                                method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ name: editingSupplierForm.name.trim() }),
+                              });
+                              if (res.ok) { setEditingSupplierId(null); loadSuppliers(); }
+                            }}
+                            className="rounded bg-emerald-600 px-2 py-1 text-xs font-semibold text-white hover:bg-emerald-500"
+                          >Save</button>
+                          <button onClick={() => setEditingSupplierId(null)} className="rounded bg-slate-600 px-2 py-1 text-xs font-semibold text-white hover:bg-slate-500">✕</button>
+                        </div>
+                      ) : (
+                        <>
+                          <span className="text-sm font-medium text-slate-200">{s.name}</span>
+                          <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                            <button onClick={() => { setEditingSupplierId(s.id); setEditingSupplierForm({ name: s.name }); }} className="rounded bg-slate-700 px-2 py-0.5 text-xs font-medium text-slate-300 hover:bg-slate-600">Edit</button>
+                            <button
+                              onClick={async () => {
+                                if (!confirm(`Delete supplier "${s.name}"?`)) return;
+                                await apiFetch(`/api/suppliers/${s.id}`, { method: 'DELETE' });
+                                loadSuppliers();
+                              }}
+                              className="rounded bg-rose-900/50 px-2 py-0.5 text-xs font-medium text-rose-300 hover:bg-rose-800/60"
+                            >Delete</button>
+                          </div>
+                        </>
+                      )}
+                    </li>
+                  ))}
+                  {librarySuppliers.length === 0 && <li className="py-4 text-center text-xs text-slate-500">No suppliers yet</li>}
+                </ul>
+              </section>
+
+            </div>
           </div>
         )}
 
@@ -840,7 +1025,12 @@ export default function App() {
             </div>
             <div>
               <label className="mb-1 block text-sm text-slate-200">Brand</label>
-              <input value={newSpool.brand} onChange={(e) => setNewSpool((prev) => ({ ...prev, brand: e.target.value }))} placeholder="Brand" className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-base" />
+              <select value={newSpool.brand} onChange={(e) => setNewSpool((prev) => ({ ...prev, brand: e.target.value }))} className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-base">
+                <option value="">Select Brand</option>
+                {libraryBrands.map((b) => (
+                  <option key={b.id} value={b.name}>{b.name}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="mb-1 block text-sm text-slate-200">Material</label>
@@ -861,11 +1051,21 @@ export default function App() {
             </div>
             <div>
               <label className="mb-1 block text-sm text-slate-200">Colour</label>
-              <input value={newSpool.color} onChange={(e) => setNewSpool((prev) => ({ ...prev, color: e.target.value }))} placeholder="Colour" className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-base" />
+              <select value={newSpool.color} onChange={(e) => setNewSpool((prev) => ({ ...prev, color: e.target.value }))} className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-base">
+                <option value="">Select Colour</option>
+                {libraryColours.map((c) => (
+                  <option key={c.id} value={c.name}>{c.name}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="mb-1 block text-sm text-slate-200">Supplier</label>
-              <input value={newSpool.supplier} onChange={(e) => setNewSpool((prev) => ({ ...prev, supplier: e.target.value }))} placeholder="Supplier" className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-base" />
+              <select value={newSpool.supplier} onChange={(e) => setNewSpool((prev) => ({ ...prev, supplier: e.target.value }))} className="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-base">
+                <option value="">Select Supplier</option>
+                {librarySuppliers.map((s) => (
+                  <option key={s.id} value={s.name}>{s.name}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="mb-1 block text-sm text-slate-200">Cost ({displayCurrencySymbol})</label>
@@ -1033,7 +1233,12 @@ export default function App() {
                     </td>
                     <td className="px-2 py-1">
                       {editingSpoolId === spool.id ? (
-                        <input className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" value={editedSpool.brand ?? ''} onChange={(e) => setEditedSpool((prev) => ({ ...prev, brand: e.target.value }))} />
+                        <select className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" value={editedSpool.brand ?? ''} onChange={(e) => setEditedSpool((prev) => ({ ...prev, brand: e.target.value }))}>
+                          <option value="">Select Brand</option>
+                          {libraryBrands.map((b) => (
+                            <option key={b.id} value={b.name}>{b.name}</option>
+                          ))}
+                        </select>
                       ) : spool.brand || '-'}
                     </td>
                     <td className="px-2 py-1">
@@ -1056,7 +1261,12 @@ export default function App() {
                     </td>
                     <td className="px-2 py-1">
                       {editingSpoolId === spool.id ? (
-                        <input className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" value={editedSpool.color ?? ''} onChange={(e) => setEditedSpool((prev) => ({ ...prev, color: e.target.value }))} />
+                        <select className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" value={editedSpool.color ?? ''} onChange={(e) => setEditedSpool((prev) => ({ ...prev, color: e.target.value }))}>
+                          <option value="">Select Colour</option>
+                          {libraryColours.map((c) => (
+                            <option key={c.id} value={c.name}>{c.name}</option>
+                          ))}
+                        </select>
                       ) : spool.color || '-'}
                     </td>
                     <td className="px-2 py-1">
@@ -1069,7 +1279,12 @@ export default function App() {
                     </td>
                     <td className="px-2 py-1">
                       {editingSpoolId === spool.id ? (
-                        <input className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" value={editedSpool.supplier ?? ''} onChange={(e) => setEditedSpool((prev) => ({ ...prev, supplier: e.target.value }))} />
+                        <select className="w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm" value={editedSpool.supplier ?? ''} onChange={(e) => setEditedSpool((prev) => ({ ...prev, supplier: e.target.value }))}>
+                          <option value="">Select Supplier</option>
+                          {librarySuppliers.map((s) => (
+                            <option key={s.id} value={s.name}>{s.name}</option>
+                          ))}
+                        </select>
                       ) : spool.supplier || '-'}
                     </td>
                     <td className="px-2 py-1">
@@ -1269,6 +1484,6 @@ export default function App() {
           <p>Best experience on mobile or desktop. Pull-to-refresh on mobile when the websocket isn’t live.</p>
         </section>
       </div>
-    </div>
+    </div>   
   );
 }
